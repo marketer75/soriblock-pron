@@ -219,10 +219,13 @@ function renderMeter(){
   const u = usage(); const cur = currentModel();
   $("#meter").innerHTML = `<span>오늘 AI 요청 <b>${u.n}</b>회</span><span>모델 ${esc(cur ? cur.replace("models/","") : "확인 전")}</span><span>한도 초기화 ${esc(resetTimeLocal())}</span>`;
 }
-let models = store.get("gm_models", null);      // [flash 계열 우선순위 목록]
+let models = store.get("gm_models2", null);     // [안정판 flash 우선 → lite]
 function exhausted(){ const e = store.get("gm_exhausted", {}); return e.day === pacificDay() ? e.list : []; }
 function markExhausted(m){ const l = exhausted(); if (!l.includes(m)) l.push(m); store.set("gm_exhausted", { day: pacificDay(), list: l }); }
-function currentModel(){ if (!models) return null; return models.find(m => !exhausted().includes(m)) || null; }
+function busyMap(){ const b = store.get("gm_busy", {}); const now = Date.now(); Object.keys(b).forEach(k => { if (b[k] < now) delete b[k]; }); return b; }
+function markBusy(m){ const b = busyMap(); b[m] = Date.now() + 10 * 60 * 1000; store.set("gm_busy", b); }   // 10분 동안 뒤로 미룸
+function usable(){ if (!models) return []; const ex = exhausted(), b = busyMap(); const ok = models.filter(m => !ex.includes(m)); return ok.filter(m => !b[m]).concat(ok.filter(m => b[m])); }
+function currentModel(){ return usable()[0] || null; }
 async function ensureModels(key){
   if (models && models.length) return;
   const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
@@ -231,12 +234,13 @@ async function ensureModels(key){
   const ok = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
     .map(m => m.name).filter(n => /flash/i.test(n) && !/(live|tts|image|audio|transcribe|translate|embedding|thinking-exp|exp-)/i.test(n));
   const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-  const score = n => ver(n) * 10 + (/lite/i.test(n) ? 0 : 5) - (/preview/i.test(n) ? 2 : 0) - (/-\d{3,}$|-\d{2}-\d{4}$/.test(n) ? 1 : 0);
-  const flash = ok.filter(n => !/lite/i.test(n)).sort((a,b) => score(b) - score(a)).slice(0, 2);
+  // 프리뷰 모델은 붐비는 일이 잦아서 안정판을 먼저 씀
+  const score = n => ver(n) * 10 - (/preview/i.test(n) ? 100 : 0) - (/-\d{3,}$|-\d{2}-\d{4}$/.test(n) ? 1 : 0);
+  const flash = ok.filter(n => !/lite/i.test(n)).sort((a,b) => score(b) - score(a)).slice(0, 3);
   const lite = ok.filter(n => /lite/i.test(n)).sort((a,b) => score(b) - score(a)).slice(0, 2);
   models = flash.concat(lite);
   if (!models.length) throw { kind:"other", msg:"이 키로 쓸 수 있는 Gemini Flash 모델을 찾지 못했어요." };
-  store.set("gm_models", models);
+  store.set("gm_models2", models);
 }
 async function apiError(r){
   let j = null; try { j = await r.json(); } catch(e) {}
@@ -249,6 +253,7 @@ async function apiError(r){
     const secs = ri && ri.retryDelay ? Math.ceil(parseFloat(ri.retryDelay)) : 60;
     return { kind: perDay ? "day" : "minute", secs, msg: e.message };
   }
+  if (r.status === 503 || r.status === 500 || r.status === 504 || /UNAVAILABLE|overloaded|high demand/i.test((e.status || "") + " " + (e.message || ""))) return { kind:"busy", msg: e.message };
   if (r.status === 400 && /API key/i.test(e.message || "")) return { kind:"key", msg: e.message };
   if (r.status === 403) return { kind:"key", msg: e.message };
   return { kind:"other", msg: e.message || ("HTTP " + r.status) };
@@ -264,24 +269,41 @@ function startCooldown(secs){
   };
   $("#mic").disabled = true; tick(); cooldownTimer = setInterval(tick, 1000);
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function gemini(prompt){
   const key = store.get("gm_key", "");
   if (!key) throw { kind:"nokey" };
   await ensureModels(key);
-  for (;;) {
-    const model = currentModel();
-    if (!model) throw { kind:"allday" };
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent`, {
-      method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents:[{ role:"user", parts:[{ text: prompt }] }], generationConfig:{ responseMimeType:"application/json", temperature:0.8 } })
-    });
+  const tried = {};           // 이번 요청에서 붐빔으로 실패한 횟수
+  const statusBefore = $("#status").textContent;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const list = usable();
+    if (!list.length) throw { kind:"allday" };
+    const model = list.find(m => (tried[m] || 0) < 2);
+    if (!model) throw { kind:"busy" };
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent`, {
+        method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ contents:[{ role:"user", parts:[{ text: prompt }] }], generationConfig:{ responseMimeType:"application/json", temperature:0.8 } })
+      });
+    } catch(e) { tried[model] = (tried[model] || 0) + 1; setStatus("네트워크가 잠깐 끊겼어요. 다시 시도 중…"); await sleep(1500); continue; }
     bumpUsage(model);
     if (r.ok) {
       const j = await r.json();
       const text = (((j.candidates || [])[0] || {}).content || {}).parts?.map(p => p.text || "").join("") || "";
+      setStatus(statusBefore);
       try { return JSON.parse(text); } catch(e) { const m = text.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0]); throw { kind:"other", msg:"AI 답을 읽지 못했어요. 다시 눌러 주세요." }; }
     }
     const err = await apiError(r);
+    if (err.kind === "busy") {
+      tried[model] = (tried[model] || 0) + 1;
+      if (tried[model] >= 2) markBusy(model);          // 두 번 붐비면 10분 동안 다른 모델 먼저
+      const nxt = usable().find(m => (tried[m] || 0) < 2);
+      setStatus(`Gemini ${model.replace("models/","")} 가 붐벼요. ${nxt && nxt !== model ? nxt.replace("models/","") + " 로 바꿔서" : "잠깐 뒤"} 다시 시도 중…`);
+      await sleep(nxt && nxt !== model ? 400 : 2000);
+      continue;
+    }
     if (err.kind === "day") {
       markExhausted(model);
       const next = currentModel();
@@ -290,11 +312,13 @@ async function gemini(prompt){
     }
     throw err;
   }
+  throw { kind:"busy" };
 }
 function handleErr(e){
   if (!e || !e.kind) { setStatus("문제가 생겼어요. 다시 눌러 주세요."); return; }
   if (e.kind === "minute") { startCooldown(e.secs || 60); setStatus(""); return; }
   if (e.kind === "allday") { showBanner(`<b>오늘 무료 한도를 모두 썼어요</b> · 쓸 수 있는 모델이 남지 않았어요. <b>${esc(resetTimeLocal())}</b>에 초기화돼요.`, "bad"); setStatus(""); return; }
+  if (e.kind === "busy") { showBanner("<b>Gemini가 지금 붐벼요</b> · 모든 모델이 혼잡해서 답을 못 받았어요. 10~20초 뒤 버튼을 다시 눌러 주세요. (한도 차감과는 무관)"); setStatus(""); return; }
   if (e.kind === "nokey") { $("#settings").hidden = false; setStatus("설정에서 Gemini 키를 먼저 저장해 주세요."); return; }
   if (e.kind === "key") { $("#settings").hidden = false; showBanner("<b>Gemini 키 오류</b> · 키가 맞는지 설정에서 확인해 주세요.", "bad"); setStatus(""); return; }
   setStatus(e.msg || "문제가 생겼어요. 다시 눌러 주세요.");
@@ -340,36 +364,95 @@ function fallbackSpeak(parts){
   });
 }
 let recognizer = null;
-let usePA = true;   // 자유 발화 발음 채점이 계속 실패하면 받아쓰기만 하도록 자동 전환
-let paMiss = 0;
-function listen(){
-  return new Promise((resolve, reject) => {
-    const cfg = azCfg();
-    if (!cfg) { reject({ kind:"az" }); return; }
-    cfg.speechRecognitionLanguage = "en-US";
-    cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "10000");
-    cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1500");
-    recognizer = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
-    if (usePA) {
-      const pa = new SpeechSDK.PronunciationAssessmentConfig("", SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, false);
-      pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3;
-      try { pa.enableProsodyAssessment = true; } catch(e) {}
-      pa.applyTo(recognizer);
-    }
+let cap = null;   // 마이크 원음 녹음 (받아쓰기 후 같은 소리로 발음 채점)
+function toPcm16(f32, inRate){
+  const ratio = inRate / 16000, n = Math.floor(f32.length / ratio), out = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const s0 = Math.floor(i * ratio), s1 = Math.min(f32.length, Math.floor((i + 1) * ratio)); let sum = 0;
+    for (let k = s0; k < s1; k++) sum += f32[k];
+    const v = Math.max(-1, Math.min(1, sum / Math.max(1, s1 - s0))); out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  return out;
+}
+async function startCapture(){
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e) {} }
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const fmt = SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+  const push = SpeechSDK.AudioInputStream.createPushStream(fmt);
+  const c = { stream, ctx, src, proc, push, fmt, chunks: [], closed: false };
+  proc.onaudioprocess = e => { if (c.closed) return; const pcm = toPcm16(e.inputBuffer.getChannelData(0), ctx.sampleRate); c.chunks.push(pcm); push.write(pcm.buffer.slice(0)); };
+  src.connect(proc); proc.connect(ctx.destination);
+  cap = c; return c;
+}
+function stopCapture(c){
+  if (!c || c.closed) return; c.closed = true;
+  try { c.src.disconnect(); c.proc.disconnect(); } catch(e) {}
+  try { c.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+  try { c.ctx.close(); } catch(e) {}
+  try { c.push.close(); } catch(e) {}
+  if (cap === c) cap = null;
+}
+let pendingReject = null;
+function cancelListen(){ if (pendingReject) { const pr = pendingReject; pendingReject = null; pr({ kind:"cancel" }); } const r = recognizer; recognizer = null; if (r) { try { r.close(); } catch(e) {} } stopCapture(cap); }
+function baseCfg(){
+  const cfg = azCfg(); if (!cfg) return null;
+  cfg.speechRecognitionLanguage = "en-US";
+  cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "10000");
+  cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1500");
+  return cfg;
+}
+// 1단계: 말한 내용을 받아쓰기
+async function listen(){
+  const cfg = baseCfg();
+  if (!cfg) throw { kind:"az" };
+  let c;
+  try { c = await startCapture(); } catch(e) { throw { kind:"mic", msg: String(e) }; }
+  const res = await new Promise((resolve, reject) => {
+    pendingReject = reject;
+    recognizer = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(c.push));
     recognizer.recognizing = (s, ev) => { if (ev.result && ev.result.text) setStatus("듣는 중: " + ev.result.text); };
-    recognizer.recognizeOnceAsync(res => {
-      const r = recognizer; recognizer = null; try { r.close(); } catch(e) {}
-      if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech && res.text) {
-        paMiss = 0;
-        let j = null; try { j = JSON.parse(res.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult)); } catch(e) {}
-        resolve({ text: res.text, json: usePA ? j : null });
-      } else if (res.reason === SpeechSDK.ResultReason.NoMatch || res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-        let why = "unknown";
-        try { const nd = SpeechSDK.NoMatchDetails.fromResult(res); why = { 0:"notrec", 1:"silence", 2:"babble", 3:"keyword" }[nd.reason] || "unknown"; } catch(e) {}
-        if (usePA && why !== "silence") { paMiss++; if (paMiss >= 2) { usePA = false; } }
-        reject({ kind:"nomatch", why });
-      } else { const d = SpeechSDK.CancellationDetails.fromResult(res); reject({ kind:"azerr", msg: d.errorDetails }); }
-    }, err => { recognizer = null; reject({ kind:"mic", msg: String(err) }); });
+    recognizer.recognizeOnceAsync(r => resolve(r), err => reject({ kind:"azerr", msg: String(err) }));
+  }).finally(() => { pendingReject = null; const r = recognizer; recognizer = null; try { r && r.close(); } catch(e) {} stopCapture(c); });
+  if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech && res.text) {
+    setStatus("발음 채점 중…");
+    const json = await scoreAudio(c.chunks, res.text).catch(() => null);
+    return { text: res.text, json };
+  }
+  if (res.reason === SpeechSDK.ResultReason.NoMatch || res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+    let why = "unknown";
+    try { const nd = SpeechSDK.NoMatchDetails.fromResult(res); why = { 0:"notrec", 1:"silence", 2:"babble", 3:"keyword" }[nd.reason] || "unknown"; } catch(e) {}
+    throw { kind:"nomatch", why };
+  }
+  if (res.reason === SpeechSDK.ResultReason.Canceled) {
+    const d = SpeechSDK.CancellationDetails.fromResult(res);
+    if (d.reason === SpeechSDK.CancellationReason.EndOfStream) throw { kind:"cancel" };
+    throw { kind:"azerr", msg: d.errorDetails };
+  }
+  throw { kind:"cancel" };
+}
+// 2단계: 녹음한 같은 소리를, 받아쓴 문장을 기준 문장으로 해서 발음 채점 (채점기와 같은 방식)
+function scoreAudio(chunks, refText){
+  return new Promise(resolve => {
+    const cfg = baseCfg(); if (!cfg || !chunks.length) return resolve(null);
+    const fmt = SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+    const push = SpeechSDK.AudioInputStream.createPushStream(fmt);
+    chunks.forEach(ch => push.write(ch.buffer.slice(0)));
+    const tail = new Int16Array(16000); push.write(tail.buffer);   // 끝에 1초 무음
+    push.close();
+    const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(push));
+    const pa = new SpeechSDK.PronunciationAssessmentConfig(refText, SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, true);
+    pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3;
+    try { pa.enableProsodyAssessment = true; } catch(e) {}
+    pa.applyTo(rec);
+    const t = setTimeout(() => { try { rec.close(); } catch(e) {} resolve(null); }, 20000);
+    rec.recognizeOnceAsync(r => {
+      clearTimeout(t); try { rec.close(); } catch(e) {}
+      if (r.reason !== SpeechSDK.ResultReason.RecognizedSpeech) return resolve(null);
+      try { resolve(JSON.parse(r.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult))); } catch(e) { resolve(null); }
+    }, () => { clearTimeout(t); try { rec.close(); } catch(e) {} resolve(null); });
   });
 }
 function pronSummary(json){
@@ -404,7 +487,7 @@ function renderFb(f, sc, answer){
   const d = document.createElement("div"); d.className = "fb";
   d.innerHTML = `<span class="verdict ${c}">${l}</span>
     <div class="sent">${markup(f.corrected || "")}</div>
-    ${!sc ? `<div class="note">이번 대답은 발음 점수 없이 받아쓰기만 했어요.</div>` : ""}
+    ${!sc ? `<div class="note">이번 대답은 발음 채점이 안 됐어요(받아쓰기만 반영).</div>` : ""}
     ${sc ? `<div class="scores"><span>발음 <b>${Math.round(sc.pron ?? 0)}</b></span><span>정확도 <b>${Math.round(sc.acc ?? 0)}</b></span><span>유창성 <b>${Math.round(sc.flu ?? 0)}</b></span><span>억양 <b>${sc.pros != null ? Math.round(sc.pros) : "-"}</b></span></div>` : ""}
     ${(f.issues || []).length ? `<ul class="list">${f.issues.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
     ${(f.sound || []).length ? `<ul class="list">${f.sound.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
@@ -519,7 +602,7 @@ JSON 한 개만: {"feedback":{"verdict":"pass|close|retry","corrected":"강세 �
 /* ---------- 마이크 버튼 ---------- */
 let started = false;
 $("#mic").onclick = async () => {
-  if (recognizer) { try { recognizer.close(); } catch(e) {} recognizer = null; setMic("idle"); return; }
+  if (recognizer || cap) { cancelListen(); setMic("idle"); setStatus(""); return; }
   if (busy) return;
   busy = true; hideBanner(); stopSpeaking();
   try {
@@ -536,9 +619,9 @@ $("#mic").onclick = async () => {
     if (e && e.kind === "nomatch") {
       if (e.why === "silence") setStatus("10초 동안 말소리가 들리지 않았어요. 버튼을 누른 뒤 바로 말해 주세요. (마이크를 손으로 가리지 않았는지도 확인)");
       else if (e.why === "babble") setStatus("주변 소음만 들렸어요. 조용한 곳에서 폰 가까이 대고 다시 말해 주세요.");
-      else if (!usePA) setStatus("알아듣지 못했어요. 이번부터는 발음 점수 없이 받아쓰기만 해서 다시 들을게요. 한 번 더 말해 주세요.");
       else setStatus("말소리는 들렸는데 알아듣지 못했어요. 조금 천천히, 또박또박 다시 말해 주세요.");
     }
+    else if (e && e.kind === "cancel") setStatus("");
     else if (e && e.kind === "mic") setStatus("마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 허용해 주세요.");
     else if (e && (e.kind === "az" || e.kind === "azerr")) setStatus("Azure에 연결하지 못했어요. 설정의 Azure 키와 지역을 확인해 주세요.");
     else handleErr(e);
