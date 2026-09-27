@@ -80,7 +80,7 @@ ul.tips b{color:var(--accent)}
 <div class="wrap">
   <header class="top">
     <div class="brand">소리블록 발음 채점<small>Azure 발음 평가 · 음소 단위</small></div>
-    <button class="linkbtn" id="toggleSettings">설정</button>
+    <span style="display:flex;gap:12px"><a class="linkbtn" href="./voice.html" style="text-decoration:none">보이스 스파링</a><button class="linkbtn" id="toggleSettings">설정</button></span>
   </header>
 
   <section class="card" id="settings" hidden>
@@ -278,7 +278,7 @@ function render(ref, json){
   $("#detail").hidden = true;
 
   // 코치 팁: 코치가 가장 자주 짚던 순서(호흡 → 발성 → 연음)로
-  if (pa.ProsodyScore != null && pa.ProsodyScore < 70 || monotone)
+  if (pa.ProsodyScore != null && pa.ProsodyScore < 90 || monotone)
     tips.push("<b>호흡·강세</b> 억양이 평평해요. 강세 단어에서 호흡과 함께 한 번에 뱉고, 기능어는 힘 빼고 흘리세요.");
   if (breaks > 0)
     tips.push(`<b>연음</b> ${breaks}곳에서 끊겼어요(‖ 표시). 그 단어 사이를 한 덩어리로 이어서 다시 읽어 보세요.`);
