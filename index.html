@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>소리블록 발음 채점</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.51.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#eef0f3; --surface:#fff; --surface2:#f6f7f9; --line:#d9dde4;
+  --ink:#1b2130; --ink2:#566077; --ink3:#8a93a6;
+  --accent:#3547c9; --accent-ink:#fff; --accent-soft:#e3e7fb;
+  --ok:#1f8a5b; --ok-soft:#dcf2e7; --warn:#b36b00; --warn-soft:#fbead0; --bad:#c2413b; --bad-soft:#f9dfdd;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --bg:#11141a; --surface:#1a1f28; --surface2:#222835; --line:#2e3543;
+  --ink:#e9ecf2; --ink2:#a9b1c3; --ink3:#747d91;
+  --accent:#8d9bff; --accent-ink:#11141a; --accent-soft:#262d4d;
+  --ok:#5fd19c; --ok-soft:#173327; --warn:#f0b04a; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3b1f1e;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:14px 40px;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.brand{font-weight:700;font-size:17px}
+.brand small{display:block;font-weight:500;font-size:12px;color:var(--ink3)}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:13px;padding:4px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.lbl{font-size:11.5px;letter-spacing:.06em;color:var(--ink3);font-weight:600}
+textarea,input{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);color:var(--ink)}
+textarea{font-family:var(--mono);font-size:15px;min-height:70px;resize:vertical}
+.row{display:flex;gap:8px}
+.rec{border:0;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:14px 18px;font-weight:700;font-size:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px}
+.rec.on{background:var(--bad);color:#fff}
+.rec .dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+.rec.on .dot{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+.status{font-size:13px;color:var(--ink2);min-height:1.2em;text-align:center}
+.scores{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.score{background:var(--surface2);border-radius:12px;padding:10px 6px;text-align:center}
+.score b{display:block;font-family:var(--mono);font-size:22px;font-variant-numeric:tabular-nums}
+.score span{font-size:11.5px;color:var(--ink2)}
+.total{display:flex;align-items:baseline;gap:10px}
+.total b{font-family:var(--mono);font-size:40px;line-height:1}
+.words{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:16px}
+.w{padding:3px 7px;border-radius:7px;border:1px solid transparent;cursor:pointer;background:transparent;color:inherit;font-family:inherit;font-size:inherit}
+.w.g{background:var(--ok-soft);color:var(--ok)}
+.w.m{background:var(--warn-soft);color:var(--warn)}
+.w.b{background:var(--bad-soft);color:var(--bad)}
+.w.om{text-decoration:line-through;background:var(--bad-soft);color:var(--bad)}
+.w.brk::after{content:"‖";margin-left:4px;color:var(--bad);font-weight:700}
+.w[aria-pressed="true"]{border-color:currentColor}
+.detail{background:var(--surface2);border-radius:12px;padding:12px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.ph{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono)}
+.ph span{padding:2px 6px;border-radius:6px;background:var(--surface);border:1px solid var(--line)}
+.ph span.bad{border-color:var(--bad);color:var(--bad)}
+ul.tips{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+ul.tips b{color:var(--accent)}
+.legend{font-size:12px;color:var(--ink3)}
+.hist{font-size:13.5px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+.hist .r{display:flex;justify-content:space-between;gap:10px}
+.hist .r span:first-child{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:13px;padding:3px 9px;border-radius:999px;background:var(--bad-soft);color:var(--bad)}
+.note{font-size:12.5px;color:var(--ink3)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">소리블록 발음 채점<small>Azure 발음 평가 · 음소 단위</small></div>
+    <button class="linkbtn" id="toggleSettings">설정</button>
+  </header>
+
+  <section class="card" id="settings" hidden>
+    <div class="lbl">AZURE 음성 키 (이 폰에만 저장돼요)</div>
+    <input id="key" type="password" autocomplete="off" placeholder="Speech 리소스의 KEY 1">
+    <div class="lbl">지역(Region)</div>
+    <input id="region" type="text" autocomplete="off" placeholder="예: eastus">
+    <div class="row"><button class="rec" id="saveKey" style="padding:10px">저장</button></div>
+    <div class="note">키는 이 브라우저에만 저장되고 페이지 코드에는 들어 있지 않아요. 무료(F0) 등급은 요금이 청구되지 않아요.</div>
+  </section>
+
+  <section class="card">
+    <div class="lbl">읽을 문장</div>
+    <textarea id="ref" spellcheck="false">My mom made me clean my room.</textarea>
+    <button class="rec" id="recBtn"><span class="dot"></span><span id="recLabel">누르고 말하기</span></button>
+    <div class="status" id="status">문장을 한 번에 읽어 주세요. 말이 끝나면 자동으로 채점돼요.</div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <div class="total"><b id="pron">–</b><span>종합 발음 점수 / 100</span></div>
+    <div class="scores">
+      <div class="score"><b id="acc">–</b><span>정확도</span></div>
+      <div class="score"><b id="flu">–</b><span>유창성</span></div>
+      <div class="score"><b id="pros">–</b><span>운율·억양</span></div>
+      <div class="score"><b id="comp">–</b><span>완성도</span></div>
+    </div>
+    <div>
+      <div class="lbl">단어별 (눌러서 음소 보기)</div>
+      <div class="words" id="words"></div>
+      <div class="legend">초록 좋음 · 주황 아쉬움 · 빨강 다시 · 취소선은 빠뜨린 단어 · ‖ 는 끊긴 곳</div>
+    </div>
+    <div class="detail" id="detail" hidden></div>
+    <div>
+      <div class="lbl">코치 팁</div>
+      <ul class="tips" id="tips"></ul>
+    </div>
+    <div class="note" id="heard"></div>
+  </section>
+
+  <section class="card">
+    <div class="lbl">최근 자주 틀린 소리</div>
+    <div class="chips" id="weakPh"><span class="note">채점 기록이 쌓이면 보여요.</span></div>
+    <div class="lbl">최근 기록</div>
+    <div class="hist" id="hist"><span class="note">아직 기록이 없어요.</span></div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+
+/* 음소별 코치 팁 — 코치 피드백 392개에서 자주 나온 지적과 맞춤 */
+const PH_TIPS = {
+  "r": "r 전조음: 입술을 살짝 내밀고 혀끝을 어디에도 닿지 않게 말아 '(우)r' 로 시작하세요.",
+  "ɹ": "r 전조음: 입술을 살짝 내밀고 혀끝을 어디에도 닿지 않게 말아 '(우)r' 로 시작하세요.",
+  "l": "light L: 혀끝을 윗니 뒤 잇몸(치경)에 확실히 붙였다 떼세요. 단어 끝 L은 혀뿌리를 내린 dark L.",
+  "θ": "th: 혀끝을 윗니에 살짝 대고 바람만 내보내세요. 's'나 't'로 새지 않게.",
+  "ð": "th(유성): 혀끝을 윗니에 대고 성대를 울리며 바람을 내보내세요.",
+  "f": "f: 윗니를 아랫입술 안쪽에 대고 바람을 내보내세요. 'ㅍ'가 되지 않게.",
+  "v": "v: f 자리에서 성대를 울리세요. 'ㅂ'가 되지 않게.",
+  "z": "z: s 자리에서 성대를 울리세요. 'ㅈ'가 되지 않게.",
+  "ʒ": "zh: sh 입모양에서 성대를 울리세요.",
+  "æ": "æ(apple): 입을 위아래로 크게 벌리고 턱을 내리세요. '에'가 되지 않게.",
+  "ɜ": "bird 모음: 혀를 뒤로 말고 가슴으로 떨어뜨리듯 소리 내세요.",
+  "ɝ": "bird 모음: 혀를 뒤로 말고 가슴으로 떨어뜨리듯 소리 내세요.",
+  "ɚ": "약한 er: 힘 빼고 혀만 살짝 마세요.",
+  "ɪ": "짧은 i(him): 힘 빼고 짧게. 긴 '이(he)'와 구분하세요.",
+  "i": "긴 i(he): 입꼬리를 옆으로 당기고 길게 유지하세요.",
+  "ʊ": "짧은 u(book): 입술 힘 빼고 짧게.",
+  "u": "긴 u(moon): 입술을 앞으로 모으고 길게.",
+  "ʌ": "ʌ(bus): 입을 적당히 벌리고 가슴에서 짧게 '어'.",
+  "ə": "슈와: 힘을 완전히 빼고 아주 짧게. 기능어는 대부분 슈와예요.",
+  "ɑ": "ɑ(father): 입을 크게 벌리고 목 안쪽에서 '아'.",
+  "ɔ": "ɔ: 입을 둥글게 벌리고 목 안쪽에서.",
+  "oʊ": "oʊ(oh): '오'에서 '우'로 미끄러지세요. 한 음절 '오'로 끝내지 않게.",
+  "eɪ": "eɪ(say): '에'에서 '이'로 미끄러지세요.",
+  "aɪ": "aɪ(I): '아'에서 '이'로 미끄러지세요.",
+  "aʊ": "aʊ(now): '아'에서 '우'로 미끄러지세요.",
+  "t": "t: 혀끝 치경에서 호흡으로 터뜨리세요. 모음 사이면 flap t(가벼운 ㄹ)도 확인하세요.",
+  "d": "d: 성대를 울리며 혀끝 치경에서. 'ㄸ'처럼 되지 않게.",
+  "p": "p: 입술을 붙였다가 호흡으로 '퍼' 하고 터뜨리세요.",
+  "b": "b: 성대를 울리며. 'ㅃ'처럼 되지 않게.",
+  "k": "k: 혀뿌리에서 호흡으로 터뜨리세요.",
+  "g": "g: 성대를 울리며 혀뿌리에서.",
+  "ŋ": "ng: 혀뿌리를 입천장 뒤에 붙인 채 코로 울리세요. '그'를 붙이지 않게.",
+  "w": "w: 입술을 동그랗게 모았다가 풀면서 시작하세요.",
+  "j": "y: '이' 위치에서 빠르게 미끄러지세요.",
+  "ʃ": "sh: 입술을 내밀고 바람을 길게.",
+  "tʃ": "ch: 입술을 내밀고 혀를 붙였다가 터뜨리세요.",
+  "dʒ": "j: ch 위치에서 성대를 울리세요.",
+  "s": "s: 이 사이로 바람만. 'ㅆ'처럼 세게 누르지 않게.",
+  "h": "h: 목에서 호흡만 내보내세요.",
+  "m": "m: 입술을 닫고 가슴 울림으로 길게.",
+  "n": "n: 혀끝을 치경에 붙이고 코로 울리세요."
+};
+function phBase(p){ // 'ɹ' 'oʊ' 등 키 찾기
+  if (PH_TIPS[p]) return p;
+  const q = p.replace(/[ːˈˌ]/g, "");
+  if (PH_TIPS[q]) return q;
+  return PH_TIPS[q[0]] ? q[0] : null;
+}
+
+/* ---------- settings ---------- */
+function loadSettings(){ $("#key").value = store.get("az_key", ""); $("#region").value = store.get("az_region", "eastus"); }
+$("#toggleSettings").onclick = () => { $("#settings").hidden = !$("#settings").hidden; };
+$("#saveKey").onclick = () => {
+  store.set("az_key", $("#key").value.trim()); store.set("az_region", $("#region").value.trim() || "eastus");
+  $("#settings").hidden = true; $("#status").textContent = "저장했어요. 이제 녹음해 보세요.";
+};
+loadSettings();
+if (!store.get("az_key", "")) { $("#settings").hidden = false; $("#status").textContent = "처음 한 번만 Azure 키를 입력해 주세요."; }
+
+/* 문장은 주소의 ?t= 로 받을 수 있어요 (스파링 앱에서 연결) */
+try { const t = new URLSearchParams(location.search).get("t"); if (t) $("#ref").value = t; } catch(e) {}
+
+/* ---------- recording ---------- */
+let recognizer = null;
+function setRec(on){
+  $("#recBtn").classList.toggle("on", on);
+  $("#recLabel").textContent = on ? "듣는 중… (말이 끝나면 자동 채점)" : "누르고 말하기";
+}
+$("#recBtn").onclick = () => {
+  if (recognizer) { try { recognizer.close(); } catch(e){} recognizer = null; setRec(false); return; }
+  const key = store.get("az_key", ""), region = store.get("az_region", "eastus");
+  const ref = $("#ref").value.trim();
+  if (!key) { $("#settings").hidden = false; $("#status").textContent = "먼저 설정에서 Azure 키를 저장해 주세요."; return; }
+  if (!ref) { $("#status").textContent = "읽을 문장을 먼저 입력해 주세요."; return; }
+  if (!window.SpeechSDK) { $("#status").textContent = "음성 엔진을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; return; }
+  const sdk = window.SpeechSDK;
+  const sc = sdk.SpeechConfig.fromSubscriptionKey(key, region);
+  sc.speechRecognitionLanguage = "en-US";
+  sc.setProperty(sdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1200");
+  const ac = sdk.AudioConfig.fromDefaultMicrophoneInput();
+  const pa = new sdk.PronunciationAssessmentConfig(ref, sdk.PronunciationAssessmentGradingSystem.HundredMark, sdk.PronunciationAssessmentGranularity.Phoneme, true);
+  pa.phonemeAlphabet = "IPA";
+  pa.nbestPhonemeCount = 3;
+  try { pa.enableProsodyAssessment = true; } catch(e) {}
+  recognizer = new sdk.SpeechRecognizer(sc, ac);
+  pa.applyTo(recognizer);
+  setRec(true); $("#status").textContent = "말씀하세요.";
+  recognizer.recognizeOnceAsync(res => {
+    setRec(false);
+    const r = recognizer; recognizer = null; try { r.close(); } catch(e){}
+    if (res.reason === sdk.ResultReason.RecognizedSpeech) {
+      const json = JSON.parse(res.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));
+      render(ref, json);
+      $("#status").textContent = "";
+    } else if (res.reason === sdk.ResultReason.NoMatch) {
+      $("#status").textContent = "소리를 알아듣지 못했어요. 조금 더 크게, 폰 가까이에서 다시 해 주세요.";
+    } else {
+      const d = sdk.CancellationDetails.fromResult(res);
+      $("#status").textContent = d.errorDetails && /401|Unauthorized|key/i.test(d.errorDetails)
+        ? "키나 지역이 맞지 않아요. 설정을 확인해 주세요."
+        : "채점하지 못했어요: " + (d.errorDetails || "마이크 권한을 확인해 주세요.");
+    }
+  }, err => {
+    setRec(false); recognizer = null;
+    $("#status").textContent = "마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 허용해 주세요. (" + err + ")";
+  });
+};
+
+/* ---------- render ---------- */
+function cls(s){ return s >= 80 ? "g" : s >= 60 ? "m" : "b"; }
+function render(ref, json){
+  const nb = json.NBest && json.NBest[0]; if (!nb) return;
+  const pa = nb.PronunciationAssessment || {};
+  const fmt = v => v == null ? "–" : Math.round(v);
+  $("#pron").textContent = fmt(pa.PronScore); $("#acc").textContent = fmt(pa.AccuracyScore);
+  $("#flu").textContent = fmt(pa.FluencyScore); $("#pros").textContent = fmt(pa.ProsodyScore); $("#comp").textContent = fmt(pa.CompletenessScore);
+  const words = nb.Words || [];
+  const tips = []; const badPh = [];
+  let breaks = 0, monotone = false, omissions = [];
+  $("#words").innerHTML = words.map((w, i) => {
+    const a = w.PronunciationAssessment || {};
+    const et = a.ErrorType || "None";
+    const fb = a.Feedback && a.Feedback.Prosody;
+    const brk = fb && fb.Break && (fb.Break.ErrorTypes || []).some(t => t !== "None");
+    if (brk) breaks++;
+    if (fb && fb.Intonation && (fb.Intonation.ErrorTypes || []).includes("Monotone")) monotone = true;
+    if (et === "Omission") omissions.push(w.Word);
+    (w.Phonemes || []).forEach(p => { const s = p.PronunciationAssessment && p.PronunciationAssessment.AccuracyScore; if (s != null && s < 60) badPh.push(p.Phoneme); });
+    if (et === "Insertion") return "";
+    const c = et === "Omission" ? "om" : cls(a.AccuracyScore ?? 0);
+    return `<button class="w ${c}${brk ? " brk" : ""}" data-i="${i}" aria-pressed="false">${esc(w.Word)}</button>`;
+  }).join("");
+  $("#words").onclick = e => {
+    const b = e.target.closest(".w"); if (!b) return;
+    document.querySelectorAll(".w").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    showDetail(words[+b.dataset.i]);
+  };
+  $("#detail").hidden = true;
+
+  // 코치 팁: 코치가 가장 자주 짚던 순서(호흡 → 발성 → 연음)로
+  if (pa.ProsodyScore != null && pa.ProsodyScore < 70 || monotone)
+    tips.push("<b>호흡·강세</b> 억양이 평평해요. 강세 단어에서 호흡과 함께 한 번에 뱉고, 기능어는 힘 빼고 흘리세요.");
+  if (breaks > 0)
+    tips.push(`<b>연음</b> ${breaks}곳에서 끊겼어요(‖ 표시). 그 단어 사이를 한 덩어리로 이어서 다시 읽어 보세요.`);
+  if (pa.FluencyScore != null && pa.FluencyScore < 70 && !breaks)
+    tips.push("<b>연음·속도</b> 음절을 하나하나 끊어 읽는 느낌이 있어요. 0.5배속으로 이어 읽기 → 1배속 순서로 연습하세요.");
+  if (omissions.length)
+    tips.push(`<b>빠진 단어</b> ${omissions.map(esc).join(", ")} — 기능어라도 약하게라도 소리는 남겨야 해요.`);
+  const uniq = [...new Set(badPh.map(phBase).filter(Boolean))].slice(0, 3);
+  uniq.forEach(k => tips.push(`<b>/${esc(k)}/</b> ${esc(PH_TIPS[k])}`));
+  if (!tips.length) tips.push("<b>좋아요</b> 큰 문제 없이 읽었어요. 속도를 조금 올려서 한 번 더 해 보세요.");
+  $("#tips").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
+  $("#heard").textContent = "들린 문장: " + (nb.Display || json.DisplayText || "");
+  $("#result").hidden = false;
+
+  // 기록
+  const hist = store.get("hist", []);
+  hist.unshift({ t: Date.now(), ref, pron: Math.round(pa.PronScore || 0), acc: Math.round(pa.AccuracyScore || 0), pros: pa.ProsodyScore != null ? Math.round(pa.ProsodyScore) : null, bad: badPh.map(phBase).filter(Boolean) });
+  store.set("hist", hist.slice(0, 200));
+  renderHist();
+}
+function showDetail(w){
+  const d = $("#detail"); if (!w) return;
+  const a = w.PronunciationAssessment || {};
+  const phs = (w.Phonemes || []).map(p => {
+    const s = p.PronunciationAssessment && p.PronunciationAssessment.AccuracyScore;
+    const nb = p.PronunciationAssessment && p.PronunciationAssessment.NBestPhonemes;
+    const heard = nb && nb[0] && nb[0].Phoneme !== p.Phoneme ? ` → ${nb[0].Phoneme}` : "";
+    return `<span class="${s != null && s < 60 ? "bad" : ""}" title="${Math.round(s ?? 0)}">/${esc(p.Phoneme)}/${s != null && s < 60 ? esc(heard) : ""} ${Math.round(s ?? 0)}</span>`;
+  }).join("");
+  d.innerHTML = `<div><b style="font-family:var(--mono)">${esc(w.Word)}</b> · 정확도 ${Math.round(a.AccuracyScore ?? 0)}${a.ErrorType && a.ErrorType !== "None" ? " · " + esc(errKo(a.ErrorType)) : ""}</div>
+    <div class="ph">${phs || "<span>음소 정보 없음</span>"}</div>
+    <div class="note">빨간 음소는 60점 미만, 화살표 뒤는 실제로 들린 소리예요.</div>`;
+  d.hidden = false;
+}
+function errKo(t){ return ({ Mispronunciation:"발음 오류", Omission:"빠뜨림", Insertion:"덧붙임", UnexpectedBreak:"불필요하게 끊김", MissingBreak:"쉬어야 할 곳을 이어 읽음", Monotone:"억양 평평" })[t] || t; }
+function renderHist(){
+  const hist = store.get("hist", []);
+  if (!hist.length) return;
+  $("#hist").innerHTML = hist.slice(0, 8).map(h => `<div class="r"><span>${esc(h.ref)}</span><span>${h.pron}점${h.pros != null ? " · 억양 " + h.pros : ""}</span></div>`).join("");
+  const cnt = {}; hist.slice(0, 50).forEach(h => (h.bad || []).forEach(p => cnt[p] = (cnt[p] || 0) + 1));
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (top.length) $("#weakPh").innerHTML = top.map(([p, n]) => `<span class="chip">/${esc(p)}/ ${n}</span>`).join("");
+}
+renderHist();
+</script>
+</body>
+</html>
