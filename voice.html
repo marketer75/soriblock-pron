@@ -340,24 +340,35 @@ function fallbackSpeak(parts){
   });
 }
 let recognizer = null;
+let usePA = true;   // 자유 발화 발음 채점이 계속 실패하면 받아쓰기만 하도록 자동 전환
+let paMiss = 0;
 function listen(){
   return new Promise((resolve, reject) => {
     const cfg = azCfg();
     if (!cfg) { reject({ kind:"az" }); return; }
     cfg.speechRecognitionLanguage = "en-US";
-    cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1300");
-    const pa = new SpeechSDK.PronunciationAssessmentConfig("", SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, false);
-    pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3;
-    try { pa.enableProsodyAssessment = true; } catch(e) {}
+    cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "10000");
+    cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1500");
     recognizer = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
-    pa.applyTo(recognizer);
+    if (usePA) {
+      const pa = new SpeechSDK.PronunciationAssessmentConfig("", SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, false);
+      pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3;
+      try { pa.enableProsodyAssessment = true; } catch(e) {}
+      pa.applyTo(recognizer);
+    }
+    recognizer.recognizing = (s, ev) => { if (ev.result && ev.result.text) setStatus("듣는 중: " + ev.result.text); };
     recognizer.recognizeOnceAsync(res => {
       const r = recognizer; recognizer = null; try { r.close(); } catch(e) {}
-      if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+      if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech && res.text) {
+        paMiss = 0;
         let j = null; try { j = JSON.parse(res.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult)); } catch(e) {}
-        resolve({ text: res.text, json: j });
-      } else if (res.reason === SpeechSDK.ResultReason.NoMatch) reject({ kind:"nomatch" });
-      else { const d = SpeechSDK.CancellationDetails.fromResult(res); reject({ kind:"azerr", msg: d.errorDetails }); }
+        resolve({ text: res.text, json: usePA ? j : null });
+      } else if (res.reason === SpeechSDK.ResultReason.NoMatch || res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+        let why = "unknown";
+        try { const nd = SpeechSDK.NoMatchDetails.fromResult(res); why = { 0:"notrec", 1:"silence", 2:"babble", 3:"keyword" }[nd.reason] || "unknown"; } catch(e) {}
+        if (usePA && why !== "silence") { paMiss++; if (paMiss >= 2) { usePA = false; } }
+        reject({ kind:"nomatch", why });
+      } else { const d = SpeechSDK.CancellationDetails.fromResult(res); reject({ kind:"azerr", msg: d.errorDetails }); }
     }, err => { recognizer = null; reject({ kind:"mic", msg: String(err) }); });
   });
 }
@@ -393,6 +404,7 @@ function renderFb(f, sc, answer){
   const d = document.createElement("div"); d.className = "fb";
   d.innerHTML = `<span class="verdict ${c}">${l}</span>
     <div class="sent">${markup(f.corrected || "")}</div>
+    ${!sc ? `<div class="note">이번 대답은 발음 점수 없이 받아쓰기만 했어요.</div>` : ""}
     ${sc ? `<div class="scores"><span>발음 <b>${Math.round(sc.pron ?? 0)}</b></span><span>정확도 <b>${Math.round(sc.acc ?? 0)}</b></span><span>유창성 <b>${Math.round(sc.flu ?? 0)}</b></span><span>억양 <b>${sc.pros != null ? Math.round(sc.pros) : "-"}</b></span></div>` : ""}
     ${(f.issues || []).length ? `<ul class="list">${f.issues.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
     ${(f.sound || []).length ? `<ul class="list">${f.sound.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
@@ -521,7 +533,12 @@ $("#mic").onclick = async () => {
       await (S.mode === "drill" ? drillAnswer(heard) : chatAnswer(heard));
     }
   } catch(e) {
-    if (e && e.kind === "nomatch") setStatus("소리를 알아듣지 못했어요. 폰 가까이에서 다시 말해 주세요.");
+    if (e && e.kind === "nomatch") {
+      if (e.why === "silence") setStatus("10초 동안 말소리가 들리지 않았어요. 버튼을 누른 뒤 바로 말해 주세요. (마이크를 손으로 가리지 않았는지도 확인)");
+      else if (e.why === "babble") setStatus("주변 소음만 들렸어요. 조용한 곳에서 폰 가까이 대고 다시 말해 주세요.");
+      else if (!usePA) setStatus("알아듣지 못했어요. 이번부터는 발음 점수 없이 받아쓰기만 해서 다시 들을게요. 한 번 더 말해 주세요.");
+      else setStatus("말소리는 들렸는데 알아듣지 못했어요. 조금 천천히, 또박또박 다시 말해 주세요.");
+    }
     else if (e && e.kind === "mic") setStatus("마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 허용해 주세요.");
     else if (e && (e.kind === "az" || e.kind === "azerr")) setStatus("Azure에 연결하지 못했어요. 설정의 Azure 키와 지역을 확인해 주세요.");
     else handleErr(e);
