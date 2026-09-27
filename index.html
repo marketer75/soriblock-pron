@@ -214,7 +214,7 @@ $("#recBtn").onclick = () => {
   if (!ref) { $("#status").textContent = "읽을 문장을 먼저 입력해 주세요."; return; }
   if (!window.SpeechSDK) { $("#status").textContent = "음성 엔진을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; return; }
   const sdk = window.SpeechSDK;
-  const sc = sdk.SpeechConfig.fromSubscriptionKey(key, region);
+  const sc = sdk.SpeechConfig.fromSubscription(key, region);
   sc.speechRecognitionLanguage = "en-US";
   sc.setProperty(sdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "1200");
   const ac = sdk.AudioConfig.fromDefaultMicrophoneInput();
@@ -236,8 +236,8 @@ $("#recBtn").onclick = () => {
       $("#status").textContent = "소리를 알아듣지 못했어요. 조금 더 크게, 폰 가까이에서 다시 해 주세요.";
     } else {
       const d = sdk.CancellationDetails.fromResult(res);
-      $("#status").textContent = d.errorDetails && /401|Unauthorized|key/i.test(d.errorDetails)
-        ? "키나 지역이 맞지 않아요. 설정을 확인해 주세요."
+      $("#status").textContent = d.errorDetails && /401|403|Unauthorized|key|1006|contact server/i.test(d.errorDetails)
+        ? "Azure에 연결하지 못했어요. 설정의 키(KEY 1)와 지역(eastus)이 맞는지 확인해 주세요. 맞다면 인터넷 연결을 확인하고 다시 눌러 주세요."
         : "채점하지 못했어요: " + (d.errorDetails || "마이크 권한을 확인해 주세요.");
     }
   }, err => {
