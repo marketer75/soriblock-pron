@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>소리블록 원서 낭독</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.51.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#eef0f3; --surface:#fff; --surface2:#f6f7f9; --line:#d9dde4;
+  --ink:#1b2130; --ink2:#566077; --ink3:#8a93a6;
+  --accent:#3547c9; --accent-ink:#fff; --accent-soft:#e3e7fb;
+  --stress:#b7791f; --stress-soft:#fbf0d9;
+  --ok:#1f8a5b; --ok-soft:#dcf2e7; --warn:#b36b00; --warn-soft:#fbead0; --bad:#c2413b; --bad-soft:#f9dfdd;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --bg:#11141a; --surface:#1a1f28; --surface2:#222835; --line:#2e3543;
+  --ink:#e9ecf2; --ink2:#a9b1c3; --ink3:#747d91;
+  --accent:#8d9bff; --accent-ink:#11141a; --accent-soft:#262d4d;
+  --stress:#f2c14e; --stress-soft:#3a3016;
+  --ok:#5fd19c; --ok-soft:#173327; --warn:#f0b04a; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3b1f1e;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:12px 130px;display:flex;flex-direction:column;gap:12px}
+section{display:flex;flex-direction:column;gap:12px}
+button,select,input,textarea{font:inherit}
+button{cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.brand{font-weight:700;font-size:17px}
+.brand small{display:block;font-weight:500;font-size:12px;color:var(--ink3)}
+.toplinks{display:flex;gap:12px;align-items:center}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:13px;padding:4px 0;text-decoration:none}
+.meter{font-family:var(--mono);font-size:11.5px;color:var(--ink2);display:flex;gap:10px;flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.lbl{font-size:11.5px;letter-spacing:.06em;color:var(--ink3);font-weight:600}
+input,select,textarea{width:100%;font-size:15px;padding:10px 11px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);color:var(--ink)}
+textarea{resize:vertical;line-height:1.5}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface2);color:var(--ink2);padding:5px 11px;border-radius:999px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.tabs button{border:0;background:transparent;color:var(--ink2);padding:9px 4px;border-radius:9px;font-weight:600;font-size:14px}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.banner{border-radius:12px;padding:11px 13px;font-size:14px;font-weight:500}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.banner.bad{background:var(--bad-soft);color:var(--bad)}
+.banner b{font-weight:700}
+.btn{border:0;border-radius:11px;padding:11px 14px;font-weight:700;background:var(--accent);color:var(--accent-ink);text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1 1 auto}
+.btn.ghost{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.55;cursor:default}
+.again{border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:9px;padding:6px 10px;font-size:13px;font-weight:600;width:max-content;text-decoration:none}
+.again.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sub{font-size:12.5px;color:var(--ink3)}
+.note{font-size:12.5px;color:var(--ink3)}
+.sent{font-family:var(--mono);font-size:15px;line-height:1.65;word-break:break-word}
+.sent.big{font-size:18px;line-height:1.7}
+.sent .s{color:var(--stress);background:var(--stress-soft);border-radius:4px;padding:0 3px;font-weight:600}
+.sent .l{color:var(--accent);font-weight:600}
+.ko{font-size:14px;color:var(--ink2)}
+.rulenote{font-size:13px;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:6px 9px}
+.fb{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.verdict{display:inline-flex;font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:999px;width:max-content}
+.v-pass{background:var(--ok-soft);color:var(--ok)} .v-close{background:var(--warn-soft);color:var(--warn)} .v-retry{background:var(--bad-soft);color:var(--bad)}
+.scores{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--ink2)}
+.scores b{color:var(--ink)}
+.w-omit{color:var(--bad);background:var(--bad-soft);border-radius:4px;padding:0 3px;text-decoration:line-through;font-weight:600}
+.w-mis{color:var(--warn);background:var(--warn-soft);border-radius:4px;padding:0 3px;font-weight:600}
+.w-ins{color:var(--ink3);text-decoration:line-through}
+.brk{color:var(--bad);font-weight:700;padding:0 2px}
+.legend{font-size:11.5px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap}
+ol.slist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;max-height:320px;overflow:auto}
+ol.slist li{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:9px;font-size:13.5px;cursor:pointer}
+ol.slist li.cur{background:var(--accent-soft)}
+ol.slist .n{font-family:var(--mono);font-size:11.5px;color:var(--ink3);min-width:22px;padding-top:2px}
+ol.slist .dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:0 0 auto;margin-top:6px}
+ol.slist .dot.g{background:var(--ok)} ol.slist .dot.m{background:var(--warn)} ol.slist .dot.b{background:var(--bad)}
+.pick{display:flex;flex-wrap:wrap;gap:4px}
+.pick button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:3px 7px;font-family:var(--mono);font-size:14px}
+.pick button.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+table.t{width:100%;border-collapse:collapse;font-size:13px;font-family:var(--mono)}
+table.t th,table.t td{text-align:right;padding:5px 6px;border-bottom:1px solid var(--line)}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t th{color:var(--ink3);font-weight:600;font-size:11.5px}
+.timer{font-family:var(--mono);font-size:44px;font-weight:600;text-align:center;letter-spacing:.02em}
+.live{min-height:60px;font-size:15px;color:var(--ink2)}
+.steps{display:flex;gap:6px}
+.steps span{flex:1;height:6px;border-radius:999px;background:var(--line)}
+.steps span.done{background:var(--ok)} .steps span.now{background:var(--accent)}
+.expr{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.expr:last-child{border-bottom:0}
+.tag{font-family:var(--mono);font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);flex:0 0 auto;margin-top:2px}
+.tag.q{background:var(--bad-soft);color:var(--bad)} .tag.e{background:var(--ok-soft);color:var(--ok)}
+.expr .body{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.expr .en{font-weight:600}
+.x{border:0;background:transparent;color:var(--ink3);font-size:18px;line-height:1;padding:2px 6px}
+.dock{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 70%,transparent);display:flex;flex-direction:column;align-items:center;gap:6px}
+.mic{width:100%;max-width:528px;border:0;border-radius:999px;padding:16px;font-weight:700;font-size:17px;background:var(--accent);color:var(--accent-ink);display:flex;justify-content:center;align-items:center;gap:10px}
+.mic.on{background:var(--bad);color:#fff}
+.mic:disabled{opacity:.55;cursor:default}
+.mic .dot{width:11px;height:11px;border-radius:50%;background:currentColor}
+.mic.on .dot{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+.status{font-size:13px;color:var(--ink2);text-align:center;min-height:1.2em}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">원서 낭독<small>듣고 · 따라 읽고 · 책 덮고 말하기</small></div>
+    <div class="toplinks"><a class="linkbtn" href="./voice.html">보이스 스파링</a><button class="linkbtn" id="toggleSettings">설정</button></div>
+  </header>
+  <div class="meter" id="meter"></div>
+  <div class="banner warn" id="banner" hidden></div>
+
+  <section class="card" id="settings" hidden>
+    <div class="lbl">GEMINI API 키</div>
+    <input id="gmKey" type="password" autocomplete="off" placeholder="AIza…">
+    <div class="lbl">AZURE 음성 키 · 지역</div>
+    <div class="row"><input id="azKey" type="password" autocomplete="off" placeholder="KEY 1" style="flex:1"><input id="azRegion" style="max-width:120px" placeholder="eastus"></div>
+    <div class="lbl">원어민 읽기 속도</div>
+    <select id="rate"><option value="0.85">천천히</option><option value="1" selected>보통</option><option value="1.1">조금 빠르게</option></select>
+    <button class="btn" id="saveSettings">저장</button>
+    <div class="note">보이스 스파링·발음 채점과 같은 키를 함께 써요. 이미 저장했다면 그대로 쓰면 돼요.</div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="page">① 페이지</button>
+    <button role="tab" data-tab="read">② 낭독</button>
+    <button role="tab" data-tab="retell">③ 리텔링</button>
+    <button role="tab" data-tab="expr">④ 표현</button>
+  </nav>
+
+  <!-- ① 페이지 -->
+  <section id="secPage">
+    <div class="card">
+      <div class="lbl">오늘 낭독할 페이지</div>
+      <input id="pgLabel" placeholder="예: p.23 · Cassette 1 Side A">
+      <div class="row">
+        <label class="btn" for="pgPhoto">📷 페이지 사진</label>
+        <button class="btn ghost" id="pgPasteBtn">✎ 텍스트 붙여넣기</button>
+      </div>
+      <input id="pgPhoto" type="file" accept="image/*" multiple hidden>
+      <textarea id="pgText" rows="7" placeholder="낭독할 부분을 붙여 넣으세요" hidden></textarea>
+      <button class="btn" id="pgPasteGo" hidden>이 텍스트로 시작</button>
+      <div class="note">하루 1페이지(대화나 해나 독백 위주)를 권해요. 사진은 두 장까지 한 번에 올릴 수 있어요. 사진·텍스트는 문장 정리를 위해 Gemini로만 보내고, 정리된 본문은 이 폰 브라우저에만 남아요. 앱 코드나 GitHub에는 올라가지 않아요.</div>
+    </div>
+    <div class="card" id="pgNow" hidden></div>
+    <div class="card" id="pgHist" hidden></div>
+  </section>
+
+  <!-- ② 낭독 -->
+  <section id="secRead" hidden>
+    <div class="card">
+      <div class="lbl">오늘의 소리 규칙 (소리튠에서 배운 것 하나)</div>
+      <div class="chips" id="rules"></div>
+      <div class="lbl">옵션</div>
+      <div class="chips">
+        <button class="chip" id="optShadow">문장마다 원어민 먼저 듣기</button>
+        <button class="chip" id="optKo">한국어 뜻 보기</button>
+      </div>
+      <div class="note">오디오북으로 먼저 듣고 따라 했다면, 여기서는 <b>혼자 읽기</b>로 채점받으세요. 버튼을 누르면 문장마다 자동으로 넘어가요.</div>
+    </div>
+    <div class="card" id="focus"></div>
+    <div class="card" id="roundBox" hidden></div>
+    <div class="card"><div class="lbl">페이지 전체 · 탭하면 그 문장부터</div><ol class="slist" id="slist"></ol></div>
+  </section>
+
+  <!-- ③ 리텔링 -->
+  <section id="secRetell" hidden>
+    <div class="card">
+      <div class="lbl">책 덮고 내 말로 말하기 · 같은 내용을 3번, 점점 짧게</div>
+      <div class="chips">
+        <button class="chip" data-len="short">짧게 60 → 45 → 30초</button>
+        <button class="chip" data-len="normal">보통 2:00 → 1:30 → 1:00</button>
+      </div>
+      <div class="steps" id="retSteps"><span></span><span></span><span></span></div>
+      <div class="timer" id="retTimer">0:60</div>
+      <div class="live" id="retLive">책을 덮고, 떠오르는 영어 키워드 서너 개만 머릿속에 정한 뒤 시작하세요. 막히면 쉬운 단어로 돌려 말하고, 멈추지 말고 끝까지 가세요.</div>
+    </div>
+    <div class="card" id="retFb" hidden></div>
+  </section>
+
+  <!-- ④ 표현 -->
+  <section id="secExpr" hidden>
+    <div class="card">
+      <div class="row between"><div class="lbl" id="exCount">저장한 표현</div><button class="again" id="exClear">모두 지우기</button></div>
+      <div id="exList"></div>
+      <div class="row">
+        <button class="btn ghost" id="exFill">한국어 뜻 채우기</button>
+        <button class="btn" id="exCsv">Anki용 CSV 내보내기</button>
+      </div>
+      <div class="note">? = 모르는 표현, E = 알아둘 표현, R = 리텔링에서 교정받은 표현. CSV는 Anki의 파일 가져오기로 바로 넣을 수 있어요(앞면 한국어 뜻, 뒷면 영어 + 원문 문장).</div>
+    </div>
+  </section>
+</div>
+
+<div class="dock" id="dock" hidden>
+  <button class="mic" id="mic"><span class="dot"></span><span id="micLabel">시작</span></button>
+  <div class="status" id="status" aria-live="polite"></div>
+</div>
+
+<script>
+const COACH = `코치(Raina)의 실제 피드백 음성 392개를 받아써서 집계한, 태원님이 가장 자주 지적받은 순서:
+1) 호흡으로 뱉기 부족(231회) - 강세 단어에서 호흡과 함께 한 번에 뱉지 못함
+2) 성대 울림·발성 위치(210회) - 소리가 입 앞에 머묾, 가슴·아래로 떨어뜨려야 함
+3) 연음·연결(200회) - 단어 사이가 끊기고 한국어식으로 음절을 끊어 읽음
+4) 혀 위치(154회), 5) 모음 정확도(144회), 6) 강세·리듬(106회), 7) 기능어 약화(54회), 8) r·L 사운드
+코치 말투: 따뜻하고 짧게, "태원님~" 으로 시작, 칭찬 한 가지 + 고칠 것 한 가지.`;
+
+const RULES = [
+  ["breath", "강세 뱉기", "강세 받는 내용어를 호흡과 함께 한 번에 뱉어야 하는 지점"],
+  ["link", "연음", "단어끼리 이어 붙여야 하는 지점(자음+모음 연결, 같은 자음 겹침, 끝소리 연결)"],
+  ["flap", "t 플랩·약화", "t/d가 모음 사이에서 ㄹ처럼 구르거나, 단어 끝에서 멈추듯 약해지는 지점"],
+  ["func", "기능어 약화", "to, of, and, the, for, can, you 같은 기능어를 약하고 짧게 줄여 말하는 지점"],
+  ["chunk", "끊어 읽기", "의미 단위로 묶어 읽고 잠깐 쉬어야 하는 지점"],
+  ["rl", "r·L", "r 과 L 소리가 나오는 단어와 주의할 점"]
+];
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const O = Object.assign({ tab:"page", shadow:false, ko:false, rule:"", retLen:"short" }, store.get("rd_opt", {}));
+const saveO = () => store.set("rd_opt", O);
+let P = store.get("rd_page", null);   // 오늘 페이지 (본문은 이 폰에만)
+const saveP = () => store.set("rd_page", P);
+const r0 = n => n == null || isNaN(n) ? "-" : Math.round(n);
+
+/* ---------- 설정 ---------- */
+function loadSettings(){
+  $("#gmKey").value = store.get("gm_key", ""); $("#azKey").value = store.get("az_key", "");
+  $("#azRegion").value = store.get("az_region", "eastus"); $("#rate").value = String(store.get("tts_rate", 1));
+}
+$("#toggleSettings").onclick = () => { $("#settings").hidden = !$("#settings").hidden; };
+$("#saveSettings").onclick = () => {
+  store.set("gm_key", $("#gmKey").value.trim()); store.set("az_key", $("#azKey").value.trim());
+  store.set("az_region", $("#azRegion").value.trim() || "eastus"); store.set("tts_rate", +$("#rate").value);
+  $("#settings").hidden = true; setStatus("저장했어요.");
+};
+
+/* ---------- Gemini (무료 등급, 보이스 스파링과 같은 방식) ---------- */
+function pacificDay(){ return new Intl.DateTimeFormat("en-CA", { timeZone:"America/Los_Angeles" }).format(new Date()); }
+function resetTimeLocal(){
+  const now = new Date();
+  for (let m = 1; m <= 26 * 60; m++) {
+    const t = new Date(now.getTime() + m * 60000);
+    const hm = new Intl.DateTimeFormat("en-GB", { timeZone:"America/Los_Angeles", hour:"2-digit", minute:"2-digit", hourCycle:"h23" }).format(t);
+    if (hm === "00:00") return t.toLocaleTimeString("ko-KR", { hour:"numeric", minute:"2-digit" });
+  }
+  return "태평양 시간 자정";
+}
+function usage(){ const u = store.get("gm_usage", {}); return u.day === pacificDay() ? u : { day: pacificDay(), n: 0, byModel: {} }; }
+function bumpUsage(model){ const u = usage(); u.n++; u.byModel[model] = (u.byModel[model] || 0) + 1; store.set("gm_usage", u); renderMeter(); }
+function renderMeter(){
+  const u = usage(); const cur = currentModel();
+  $("#meter").innerHTML = `<span>오늘 AI 요청 <b>${u.n}</b>회</span><span>모델 ${esc(cur ? cur.replace("models/","") : "확인 전")}</span>`;
+}
+let models = store.get("gm_models2", null);
+function exhausted(){ const e = store.get("gm_exhausted", {}); return e.day === pacificDay() ? e.list : []; }
+function markExhausted(m){ const l = exhausted(); if (!l.includes(m)) l.push(m); store.set("gm_exhausted", { day: pacificDay(), list: l }); }
+function busyMap(){ const b = store.get("gm_busy", {}); const now = Date.now(); Object.keys(b).forEach(k => { if (b[k] < now) delete b[k]; }); return b; }
+function markBusy(m){ const b = busyMap(); b[m] = Date.now() + 10 * 60 * 1000; store.set("gm_busy", b); }
+function usable(){ if (!models) return []; const ex = exhausted(), b = busyMap(); const ok = models.filter(m => !ex.includes(m)); return ok.filter(m => !b[m]).concat(ok.filter(m => b[m])); }
+function currentModel(){ return usable()[0] || null; }
+async function ensureModels(key){
+  if (models && models.length) return;
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+  if (!r.ok) throw await apiError(r);
+  const j = await r.json();
+  const ok = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => m.name).filter(n => /flash/i.test(n) && !/(live|tts|image|audio|transcribe|translate|embedding|thinking-exp|exp-)/i.test(n));
+  const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+  const score = n => ver(n) * 10 - (/preview/i.test(n) ? 100 : 0) - (/-\d{3,}$|-\d{2}-\d{4}$/.test(n) ? 1 : 0);
+  const flash = ok.filter(n => !/lite/i.test(n)).sort((a,b) => score(b) - score(a)).slice(0, 3);
+  const lite = ok.filter(n => /lite/i.test(n)).sort((a,b) => score(b) - score(a)).slice(0, 2);
+  models = flash.concat(lite);
+  if (!models.length) throw { kind:"other", msg:"이 키로 쓸 수 있는 Gemini Flash 모델을 찾지 못했어요." };
+  store.set("gm_models2", models);
+}
+async function apiError(r){
+  let j = null; try { j = await r.json(); } catch(e) {}
+  const e = (j && j.error) || {};
+  if (r.status === 429) {
+    const det = e.details || [];
+    const qf = det.find(d => /QuotaFailure/.test(d["@type"] || "")); const ri = det.find(d => /RetryInfo/.test(d["@type"] || ""));
+    const ids = ((qf && qf.violations) || []).map(v => (v.quotaId || "") + " " + (v.quotaMetric || "")).join(" ");
+    const perDay = /PerDay/i.test(ids) || /per day|daily/i.test(e.message || "");
+    const secs = ri && ri.retryDelay ? Math.ceil(parseFloat(ri.retryDelay)) : 60;
+    return { kind: perDay ? "day" : "minute", secs, msg: e.message };
+  }
+  if (r.status === 503 || r.status === 500 || r.status === 504 || /UNAVAILABLE|overloaded|high demand/i.test((e.status || "") + " " + (e.message || ""))) return { kind:"busy", msg: e.message };
+  if (r.status === 400 && /API key/i.test(e.message || "")) return { kind:"key", msg: e.message };
+  if (r.status === 403) return { kind:"key", msg: e.message };
+  return { kind:"other", msg: e.message || ("HTTP " + r.status) };
+}
+function showBanner(html, cls){ const b = $("#banner"); b.className = "banner " + (cls || "warn"); b.innerHTML = html; b.hidden = false; }
+function hideBanner(){ $("#banner").hidden = true; }
+async function gemini(prompt, images = [], temp = 0.7){
+  const key = store.get("gm_key", "");
+  if (!key) throw { kind:"nokey" };
+  await ensureModels(key);
+  const tried = {};
+  const parts = images.map(b64 => ({ inline_data: { mime_type:"image/jpeg", data: b64 } })).concat([{ text: prompt }]);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const list = usable();
+    if (!list.length) throw { kind:"allday" };
+    const model = list.find(m => (tried[m] || 0) < 2);
+    if (!model) throw { kind:"busy" };
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent`, {
+        method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ contents:[{ role:"user", parts }], generationConfig:{ responseMimeType:"application/json", temperature: temp } })
+      });
+    } catch(e) { tried[model] = (tried[model] || 0) + 1; await sleep(1500); continue; }
+    bumpUsage(model);
+    if (r.ok) {
+      const j = await r.json();
+      const text = (((j.candidates || [])[0] || {}).content || {}).parts?.map(p => p.text || "").join("") || "";
+      try { return JSON.parse(text); } catch(e) { const m = text.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0]); throw { kind:"other", msg:"AI 답을 읽지 못했어요. 다시 해 주세요." }; }
+    }
+    const err = await apiError(r);
+    if (err.kind === "busy") { tried[model] = (tried[model] || 0) + 1; if (tried[model] >= 2) markBusy(model); await sleep(800); continue; }
+    if (err.kind === "day") { markExhausted(model); if (currentModel()) { renderMeter(); continue; } throw { kind:"allday" }; }
+    if (err.kind === "minute") { setStatus(`분당 한도에 걸려서 ${err.secs}초 기다렸다가 다시 시도해요…`); await sleep(err.secs * 1000); continue; }
+    throw err;
+  }
+  throw { kind:"busy" };
+}
+function aiErrText(e){
+  if (!e || !e.kind) return "문제가 생겼어요. 다시 해 주세요.";
+  if (e.kind === "nokey") { $("#settings").hidden = false; return "설정에서 Gemini 키를 먼저 저장해 주세요."; }
+  if (e.kind === "key") { $("#settings").hidden = false; return "Gemini 키가 맞는지 설정에서 확인해 주세요."; }
+  if (e.kind === "allday") return `오늘 Gemini 무료 한도를 다 썼어요. ${resetTimeLocal()}에 초기화돼요. (낭독 채점은 Azure라 계속 돼요)`;
+  if (e.kind === "busy") return "Gemini가 붐벼요. 10~20초 뒤 다시 해 주세요.";
+  return e.msg || "문제가 생겼어요. 다시 해 주세요.";
+}
+
+/* ---------- Azure: 원어민 소리 · 녹음 · 낭독 채점 ---------- */
+function azCfg(){
+  const key = store.get("az_key", ""), region = store.get("az_region", "eastus");
+  if (!key || !window.SpeechSDK) return null;
+  return SpeechSDK.SpeechConfig.fromSubscription(key, region);
+}
+let player = null, playerDone = null;
+function stopSpeaking(){
+  try { if (player) player.pause(); } catch(e) {} try { speechSynthesis.cancel(); } catch(e) {}
+  if (playerDone) { const d = playerDone; playerDone = null; d(); }
+}
+function ssmlOf(parts){
+  const rate = Math.round((store.get("tts_rate", 1) - 1) * 100);
+  const v = { ko:"ko-KR-SunHiNeural", en:"en-US-JennyNeural" };
+  return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">` +
+    parts.filter(p => p.text).map(p => `<voice name="${v[p.lang]}"><prosody rate="${rate}%">${esc(p.text)}</prosody></voice>`).join("") + `</speak>`;
+}
+const ttsCache = new Map();
+function synth(parts){
+  const ssml = ssmlOf(parts);
+  if (ttsCache.has(ssml)) return ttsCache.get(ssml);
+  const p = new Promise(resolve => {
+    const cfg = azCfg(); if (!cfg) return resolve(null);
+    cfg.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+    const sy = new SpeechSDK.SpeechSynthesizer(cfg, null);
+    sy.speakSsmlAsync(ssml, res => {
+      sy.close();
+      if (res.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) resolve(URL.createObjectURL(new Blob([res.audioData], { type:"audio/mpeg" })));
+      else { ttsCache.delete(ssml); resolve(null); }
+    }, () => { sy.close(); ttsCache.delete(ssml); resolve(null); });
+  });
+  ttsCache.set(ssml, p);
+  if (ttsCache.size > 60) ttsCache.delete(ttsCache.keys().next().value);
+  return p;
+}
+function playUrl(url){
+  stopSpeaking();
+  return new Promise(resolve => {
+    playerDone = resolve;
+    const done = () => { if (playerDone === resolve) playerDone = null; resolve(); };
+    player = new Audio(url); player.onended = done; player.onerror = done;
+    player.play().catch(done);
+  });
+}
+async function speak(parts){
+  stopSpeaking();
+  const url = await synth(parts);
+  if (!url) return fallbackSpeak(parts);
+  return playUrl(url);
+}
+function fallbackSpeak(parts){
+  return new Promise(resolve => {
+    try {
+      const list = parts.filter(p => p.text); if (!list.length) return resolve();
+      list.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.text); u.lang = p.lang === "ko" ? "ko-KR" : "en-US"; u.rate = store.get("tts_rate", 1); if (i === list.length - 1) { u.onend = resolve; u.onerror = resolve; } speechSynthesis.speak(u); });
+    } catch(e) { resolve(); }
+  });
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-say]"); if (b) { speak([{ lang:"en", text: b.dataset.say }]); return; }
+  const p = e.target.closest("[data-play]"); if (p && p.dataset.play) playUrl(p.dataset.play);
+});
+
+let recognizer = null, cap = null, pendingReject = null;
+function toPcm16(f32, inRate){
+  const ratio = inRate / 16000, n = Math.floor(f32.length / ratio), out = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const s0 = Math.floor(i * ratio), s1 = Math.min(f32.length, Math.floor((i + 1) * ratio)); let sum = 0;
+    for (let k = s0; k < s1; k++) sum += f32[k];
+    const v = Math.max(-1, Math.min(1, sum / Math.max(1, s1 - s0))); out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  return out;
+}
+async function startCapture(){
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e) {} }
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const fmt = SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1);
+  const push = SpeechSDK.AudioInputStream.createPushStream(fmt);
+  const c = { stream, ctx, src, proc, push, chunks: [], closed: false };
+  proc.onaudioprocess = e => { if (c.closed) return; const pcm = toPcm16(e.inputBuffer.getChannelData(0), ctx.sampleRate); c.chunks.push(pcm); push.write(pcm.buffer.slice(0)); };
+  src.connect(proc); proc.connect(ctx.destination);
+  cap = c; return c;
+}
+function stopCapture(c){
+  if (!c || c.closed) return; c.closed = true;
+  try { c.src.disconnect(); c.proc.disconnect(); } catch(e) {}
+  try { c.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+  try { c.ctx.close(); } catch(e) {}
+  try { c.push.close(); } catch(e) {}
+  if (cap === c) cap = null;
+}
+function cancelListen(){ if (pendingReject) { const pr = pendingReject; pendingReject = null; pr({ kind:"cancel" }); } const r = recognizer; recognizer = null; if (r) { try { r.close(); } catch(e) {} } stopCapture(cap); }
+function baseCfg(endSilence){
+  const cfg = azCfg(); if (!cfg) return null;
+  cfg.speechRecognitionLanguage = "en-US";
+  cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "10000");
+  cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, String(endSilence || 1500));
+  return cfg;
+}
+function wavUrl(chunks){
+  const n = chunks.reduce((s, c) => s + c.length, 0); if (!n) return "";
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  let o = 44; chunks.forEach(c => { for (let i = 0; i < c.length; i++, o += 2) v.setInt16(o, c[i], true); });
+  return URL.createObjectURL(new Blob([buf], { type:"audio/wav" }));
+}
+// 낭독 채점: 원문을 기준 문장으로 넣고, 듣는 동시에 한 번에 채점 (재채점 대기 없음)
+async function listenRead(ref){
+  const cfg = baseCfg(1300);
+  if (!cfg) throw { kind:"az" };
+  let c;
+  try { c = await startCapture(); } catch(e) { throw { kind:"mic", msg: String(e) }; }
+  const res = await new Promise((resolve, reject) => {
+    pendingReject = reject;
+    recognizer = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(c.push));
+    const pa = new SpeechSDK.PronunciationAssessmentConfig(ref, SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, true);
+    pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3;
+    try { pa.enableProsodyAssessment = true; } catch(e) {}
+    pa.applyTo(recognizer);
+    recognizer.recognizing = (s, ev) => { if (ev.result && ev.result.text) setStatus("듣는 중: " + ev.result.text); };
+    recognizer.recognizeOnceAsync(r => resolve(r), err => reject({ kind:"azerr", msg: String(err) }));
+  }).finally(() => { pendingReject = null; const r = recognizer; recognizer = null; try { r && r.close(); } catch(e) {} stopCapture(c); });
+  if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech && res.text) {
+    let json = null; try { json = JSON.parse(res.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult)); } catch(e) {}
+    return { text: res.text, json, chunks: c.chunks };
+  }
+  if (res.reason === SpeechSDK.ResultReason.NoMatch || res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+    let why = "unknown";
+    try { const nd = SpeechSDK.NoMatchDetails.fromResult(res); why = { 0:"notrec", 1:"silence", 2:"babble", 3:"keyword" }[nd.reason] || "unknown"; } catch(e) {}
+    throw { kind:"nomatch", why };
+  }
+  if (res.reason === SpeechSDK.ResultReason.Canceled) {
+    const d = SpeechSDK.CancellationDetails.fromResult(res);
+    if (d.reason === SpeechSDK.CancellationReason.EndOfStream) throw { kind:"cancel" };
+    throw { kind:"azerr", msg: d.errorDetails };
+  }
+  throw { kind:"cancel" };
+}
+function micErrText(e){
+  if (e.kind === "mic") return "마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 허용해 주세요.";
+  if (e.kind === "az" || e.kind === "azerr") return "Azure에 연결하지 못했어요. 설정의 Azure 키와 지역을 확인해 주세요.";
+  return "알아듣지 못해서 멈췄어요. 버튼을 누르면 다시 해요.";
+}
+
+/* ---------- 공통 화면 ---------- */
+function setStatus(t){ $("#status").textContent = t; }
+function markup(s){ return esc(s).replace(/‿/g,'<span class="l">‿</span>').replace(/\b([A-Z][A-Z']{1,})\b/g, m => `<span class="s">${m}</span>`); }
+function plain(s){ return String(s||"").replace(/‿/g," ").replace(/\b([A-Z][A-Z']+)\b/g, m => m[0] + m.slice(1).toLowerCase()); }
+const wordsOf = s => String(s || "").toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+function setTab(t){
+  O.tab = t; saveO();
+  $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  $("#secPage").hidden = t !== "page"; $("#secRead").hidden = t !== "read"; $("#secRetell").hidden = t !== "retell"; $("#secExpr").hidden = t !== "expr";
+  $("#dock").hidden = !(t === "read" || t === "retell");
+  if (t !== "read" && readOn) readStop("");
+  if (t !== "retell" && ret) retFinish();
+  if (t === "page") renderPage(); if (t === "read") renderRead(); if (t === "retell") renderRetell(); if (t === "expr") renderExpr();
+  setStatus(""); window.scrollTo({ top: 0 });
+}
+$$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+/* ---------- 지난 페이지 기록 (점수만, 본문 없음) ---------- */
+function upsertHist(){
+  if (!P) return;
+  const h = store.get("rd_hist", []).filter(x => x.id !== P.id);
+  h.unshift({ id: P.id, label: P.label, date: P.date, n: P.sents.length,
+    rounds: P.rounds.map(r => ({ n: r.n, pron: r.pron, pros: r.pros, flu: r.flu })),
+    ret: (P.ret.res || []).map(r => ({ sec: r.sec, words: r.words, wpm: r.wpm })) });
+  store.set("rd_hist", h.slice(0, 80));
+}
+
+/* ---------- ① 페이지 준비 ---------- */
+async function toJpeg(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    const max = 1800, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+    const cv = document.createElement("canvas"); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+function sameWords(a, b){ return wordsOf(a).join(" ") === wordsOf(b).join(" "); }
+async function prepPage(images, text){
+  const label = $("#pgLabel").value.trim() || new Date().toLocaleDateString("ko-KR");
+  const busyBtns = [$("#pgPasteGo"), $("#pgPasteBtn")]; busyBtns.forEach(b => b.disabled = true);
+  setStatus(""); showBanner(images.length ? "페이지 글자를 읽고 문장으로 나누는 중이에요… (10~20초)" : "문장으로 나누는 중이에요…");
+  try {
+    const r = await gemini(`너는 영어 원서 낭독 코치야. ${images.length ? "사진 속 영어 소설 페이지(여러 장이면 순서대로)를 정확히 옮겨 적어." : "아래 영어 소설 텍스트를 정리해."}
+규칙:
+- 본문만. 쪽번호·머리글·장 제목 장식은 빼. 줄 끝 하이픈으로 끊긴 단어는 붙여.
+- 원문 단어를 바꾸거나 고치지 마. 따옴표 안 대화도 그대로.
+- 한 문장씩 나눠. 25단어가 넘는 문장은 쉼표 같은 자연스러운 쉼에서 둘로 나눠.
+- t: 원문 그대로.
+- a: t와 단어·철자는 완전히 같게, 강세 받는 내용어만 대문자, 이어 읽는 단어 경계는 ‿ (예: "I THOUGHT‿about it for a SECOND").
+- ko: 자연스러운 한국어 뜻.
+JSON 한 개만: {"sents":[{"t":"","a":"","ko":""}]}${text ? "\n\n텍스트:\n" + text : ""}`, images, 0.2);
+    const sents = (r.sents || []).map(s => ({ t: String(s.t || "").trim(), a: String(s.a || "").trim(), ko: String(s.ko || "").trim() }))
+      .filter(s => wordsOf(s.t).length)
+      .map(s => ({ ...s, a: s.a && sameWords(plain(s.a), s.t) ? s.a : s.t }));
+    if (!sents.length) throw { kind:"other", msg:"글자를 찾지 못했어요. 페이지가 화면에 꽉 차게, 밝은 곳에서 다시 찍어 주세요." };
+    if (P && P.rounds.length) upsertHist();
+    P = { id: Date.now().toString(36), label, date: new Date().toLocaleDateString("en-CA"), sents, rules: {}, cur: 0, rnd: { n: 1, res: {} }, rounds: [], ret: { res: [], fb: null } };
+    saveP(); upsertHist(); hideBanner();
+    $("#pgText").value = ""; $("#pgText").hidden = true; $("#pgPasteGo").hidden = true; $("#pgLabel").value = "";
+    renderPage(); setStatus(`${sents.length}문장으로 정리했어요.`);
+  } catch(e) {
+    showBanner(esc(aiErrText(e)), "bad");
+  } finally { busyBtns.forEach(b => b.disabled = false); }
+}
+$("#pgPhoto").onchange = async e => {
+  const files = [...e.target.files].slice(0, 2); e.target.value = "";
+  if (!files.length) return;
+  try { const imgs = []; for (const f of files) imgs.push(await toJpeg(f)); await prepPage(imgs, ""); }
+  catch(err) { showBanner("사진을 읽지 못했어요. 다른 사진으로 해 주세요.", "bad"); }
+};
+$("#pgPasteBtn").onclick = () => { const h = !$("#pgText").hidden; $("#pgText").hidden = h; $("#pgPasteGo").hidden = h; if (!h) $("#pgText").focus(); };
+$("#pgPasteGo").onclick = () => { const t = $("#pgText").value.trim(); if (!t) { setStatus("텍스트를 붙여 넣어 주세요."); return; } prepPage([], t.slice(0, 6000)); };
+function renderPage(){
+  const now = $("#pgNow");
+  if (!P) { now.hidden = true; }
+  else {
+    now.hidden = false;
+    const last = P.rounds[P.rounds.length - 1];
+    now.innerHTML = `<div class="lbl">지금 페이지</div>
+      <div style="font-weight:700;font-size:16px">${esc(P.label)}</div>
+      <div class="sub">${P.sents.length}문장 · 낭독 ${P.rounds.length}회 완료${last ? ` · 마지막 발음 ${r0(last.pron)} · 억양 ${r0(last.pros)}` : ""} · 리텔링 ${(P.ret.res || []).length}/3</div>
+      <div class="sent" style="font-size:13.5px;color:var(--ink2)">${esc(P.sents[0].t)} …</div>
+      <div class="row"><button class="btn" id="goRead">낭독하러 가기</button></div>`;
+    $("#goRead").onclick = () => setTab("read");
+  }
+  const h = store.get("rd_hist", []).filter(x => !P || x.id !== P.id).filter(x => x.rounds.length || x.ret.length);
+  const hb = $("#pgHist"); hb.hidden = !h.length;
+  if (h.length) hb.innerHTML = `<div class="lbl">지난 페이지 기록</div><table class="t"><tr><th>페이지</th><th>회차</th><th>첫→끝 발음</th><th>리텔링 WPM</th></tr>${
+    h.slice(0, 15).map(x => { const a = x.rounds[0], z = x.rounds[x.rounds.length - 1]; const w = x.ret.length ? x.ret.map(r => r.wpm).join("→") : "-";
+      return `<tr><td>${esc(x.label)}<div class="sub">${esc(x.date)}</div></td><td>${x.rounds.length}</td><td>${a ? r0(a.pron) + "→" + r0(z.pron) : "-"}</td><td>${esc(w)}</td></tr>`; }).join("")}</table>`;
+}
+
+/* ---------- ② 낭독 ---------- */
+let readOn = false, readLoop = 0, lastAttempt = null, picking = null;
+function renderRules(){
+  $("#rules").innerHTML = RULES.map(([k, n]) => `<button class="chip" data-rule="${k}" aria-pressed="${O.rule === k}">${esc(n)}</button>`).join("");
+  $$("[data-rule]").forEach(b => b.onclick = () => { O.rule = O.rule === b.dataset.rule ? "" : b.dataset.rule; saveO(); renderRules(); loadRule(); });
+  $("#optShadow").setAttribute("aria-pressed", String(O.shadow)); $("#optKo").setAttribute("aria-pressed", String(O.ko));
+}
+$("#optShadow").onclick = () => { O.shadow = !O.shadow; saveO(); renderRules(); };
+$("#optKo").onclick = () => { O.ko = !O.ko; saveO(); renderRules(); renderFocus(); };
+async function loadRule(){
+  renderFocus();
+  if (!P || !O.rule || P.rules[O.rule]) return;
+  const rule = RULES.find(r => r[0] === O.rule);
+  setStatus(`'${rule[1]}' 지점 표시하는 중…`);
+  try {
+    const r = await gemini(`너는 소리튜닝 발음 코치야. 아래 문장들에서 "${rule[1]}" 규칙(${rule[2]})이 적용되는 지점을 문장마다 최대 2개 짚어 줘.
+각 지점은 짧게: "단어(들) → 한국어로 소리 설명" (예: "get it → 게릿, t가 ㄹ처럼"). 해당 없으면 빈 배열.
+문장 순서와 개수를 그대로 지켜.
+${P.sents.map((s, i) => `${i + 1}. ${s.t}`).join("\n")}
+JSON 한 개만: {"notes":[["..."],[]]}`, [], 0.3);
+    P.rules[O.rule] = P.sents.map((_, i) => ((r.notes || [])[i] || []).slice(0, 2).map(String)); saveP();
+    setStatus(""); renderFocus();
+  } catch(e) { setStatus(aiErrText(e)); }
+}
+function sentDot(i){
+  const x = P.rnd.res[i]; if (!x) return "";
+  return x.good ? "g" : x.pron >= 65 ? "m" : "b";
+}
+function renderList(){
+  if (!P) { $("#slist").innerHTML = ""; return; }
+  $("#slist").innerHTML = P.sents.map((s, i) => `<li data-i="${i}" class="${i === P.cur ? "cur" : ""}"><span class="dot ${sentDot(i)}"></span><span class="n">${i + 1}</span><span>${esc(s.t)}</span></li>`).join("");
+  $$("#slist li").forEach(li => li.onclick = () => { if (readOn) readStop("멈췄어요."); P.cur = +li.dataset.i; saveP(); lastAttempt = null; picking = null; renderRead(); window.scrollTo({ top: 0, behavior:"smooth" }); });
+}
+function attemptHtml(a){
+  if (!a) return "";
+  if (!a.ok) return `<div class="fb"><span class="verdict v-retry">채점 안 됨</span><div class="note">발음 데이터를 받지 못했어요. 다시 읽어 주세요.</div></div>`;
+  const sc = a.sc;
+  const words = a.words.map(w => (w.brk ? `<span class="brk" title="여기서 끊김">|</span>` : "") +
+    (w.et === "Omission" ? `<span class="w-omit">${esc(w.w)}</span>` : w.et === "Insertion" ? `<span class="w-ins">${esc(w.w)}</span>` : (w.et === "Mispronunciation" || w.acc < 70) ? `<span class="w-mis" title="${r0(w.acc)}">${esc(w.w)}</span>` : esc(w.w))).join(" ");
+  return `<div class="fb">
+    <span class="verdict ${a.good ? "v-pass" : a.sc.pron >= 65 ? "v-close" : "v-retry"}">${a.good ? "좋아요" : a.omit ? `${a.omit}단어 빠뜨림` : "한 번 더"}</span>
+    <div class="sent">${words}</div>
+    <div class="legend"><span><span class="w-omit">빠뜨림</span></span><span><span class="w-mis">발음</span></span><span><span class="w-ins">덧붙임</span></span><span><span class="brk">|</span> 어색하게 끊김</span></div>
+    <div class="scores"><span>발음 <b>${r0(sc.pron)}</b></span><span>정확도 <b>${r0(sc.acc)}</b></span><span>유창성 <b>${r0(sc.flu)}</b></span><span>억양 <b>${r0(sc.pros)}</b></span><span>완성도 <b>${r0(sc.comp)}</b></span></div>
+    ${a.low ? `<div class="note">낮은 소리: ${esc(a.low)}</div>` : ""}
+    <div class="row"><button class="again" data-play="${esc(a.audio)}">▶ 내 목소리</button><button class="again" data-say="${esc(a.ref)}">▶ 원어민</button></div>
+  </div>`;
+}
+function renderFocus(){
+  const f = $("#focus");
+  if (!P) { f.innerHTML = `<div class="note">먼저 ① 페이지에서 오늘 읽을 페이지를 준비해 주세요.</div><button class="btn" id="goPage">페이지 준비하기</button>`; $("#goPage").onclick = () => setTab("page"); return; }
+  const i = Math.min(P.cur, P.sents.length - 1), s = P.sents[i];
+  const notes = O.rule && P.rules[O.rule] ? P.rules[O.rule][i] || [] : null;
+  const ruleName = O.rule ? RULES.find(r => r[0] === O.rule)[1] : "";
+  const done = P.cur >= P.sents.length;
+  f.innerHTML = `<div class="row between"><span class="sub">${esc(P.label)} · ${P.rnd.n}회차 · 문장 ${i + 1}/${P.sents.length}</span><span class="row" style="gap:6px"><button class="again" id="fPrev" aria-label="이전 문장">◀</button><button class="again" id="fNext" aria-label="다음 문장">▶</button></span></div>
+    ${done ? `<div class="note">이번 회차 마지막 문장까지 읽었어요. 버튼을 누르면 결과를 정리해요.</div>` : ""}
+    <div class="sent big">${markup(s.a || s.t)}</div>
+    ${O.ko && s.ko ? `<div class="ko">${esc(s.ko)}</div>` : ""}
+    ${notes ? (notes.length ? `<div class="rulenote">${esc(ruleName)}: ${notes.map(esc).join(" · ")}</div>` : `<div class="note">${esc(ruleName)}: 이 문장엔 해당 없음</div>`) : ""}
+    <div class="row"><button class="again" data-say="${esc(s.t)}">▶ 원어민</button><a class="again" href="./?t=${encodeURIComponent(s.t)}" target="_blank" rel="noopener">발음만 정밀 채점</a><button class="again ${picking ? "on" : ""}" id="fPick">✎ 표현 저장</button></div>
+    <div id="picker"></div>
+    <div id="attempt">${lastAttempt && lastAttempt.i === i ? attemptHtml(lastAttempt) : ""}</div>`;
+  $("#fPrev").onclick = () => { if (readOn) readStop("멈췄어요."); P.cur = Math.max(0, i - 1); saveP(); lastAttempt = null; picking = null; renderRead(); };
+  $("#fNext").onclick = () => { if (readOn) readStop("멈췄어요."); P.cur = Math.min(P.sents.length - 1, i + 1); saveP(); lastAttempt = null; picking = null; renderRead(); };
+  $("#fPick").onclick = () => { picking = picking ? null : { i, a: null, b: null }; renderFocus(); };
+  if (picking && picking.i === i) renderPicker(s);
+}
+function renderPicker(s){
+  const toks = s.t.split(/\s+/).filter(Boolean);
+  const lo = picking.a == null ? -1 : Math.min(picking.a, picking.b ?? picking.a), hi = picking.a == null ? -1 : Math.max(picking.a, picking.b ?? picking.a);
+  const box = $("#picker");
+  box.innerHTML = `<div class="fb"><div class="note">저장할 표현의 첫 단어와 마지막 단어를 탭하세요.</div>
+    <div class="pick">${toks.map((t, k) => `<button data-k="${k}" class="${k >= lo && k <= hi ? "sel" : ""}">${esc(t)}</button>`).join("")}</div>
+    <div class="row"><button class="btn" data-tag="?" ${lo < 0 ? "disabled" : ""}>? 모르는 표현</button><button class="btn" data-tag="E" ${lo < 0 ? "disabled" : ""}>E 알아둘 표현</button></div></div>`;
+  box.querySelectorAll("[data-k]").forEach(b => b.onclick = () => {
+    const k = +b.dataset.k;
+    if (picking.a == null || picking.b != null) { picking.a = k; picking.b = null; } else picking.b = k;
+    renderPicker(s);
+  });
+  box.querySelectorAll("[data-tag]").forEach(b => b.onclick = () => {
+    const en = toks.slice(lo, hi + 1).join(" ").replace(/^[^A-Za-z0-9']+|[^A-Za-z0-9']+$/g, "");
+    addExpr({ tag: b.dataset.tag, en, ko: "", ctx: s.t, src: P.label });
+    picking = null; renderFocus(); setStatus(`저장했어요: ${en}`);
+  });
+}
+function renderRounds(){
+  const box = $("#roundBox");
+  if (!P || !P.rounds.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const rs = P.rounds, last = rs[rs.length - 1], prev = rs[rs.length - 2];
+  const ready = rs.length >= 2 && rs.slice(-2).every(r => r.pron >= 85 && (r.pros == null || r.pros >= 80));
+  box.innerHTML = `<div class="lbl">회차별 기록 · 이 페이지</div>
+    <table class="t"><tr><th>회차</th><th>발음</th><th>정확도</th><th>유창성</th><th>억양</th><th>빠뜨림</th></tr>
+    ${rs.map(r => `<tr><td>${r.n}회</td><td>${r0(r.pron)}</td><td>${r0(r.acc)}</td><td>${r0(r.flu)}</td><td>${r0(r.pros)}</td><td>${r.omit}</td></tr>`).join("")}</table>
+    ${prev ? `<div class="note">지난 회차보다 발음 ${last.pron - prev.pron >= 0 ? "+" : ""}${r0(last.pron - prev.pron)} · 억양 ${last.pros != null && prev.pros != null ? (last.pros - prev.pros >= 0 ? "+" : "") + r0(last.pros - prev.pros) : "-"}</div>` : ""}
+    ${ready ? `<div class="rulenote">두 회차 연속 발음 85·억양 80을 넘었어요. 이 페이지는 충분해요. ③ 리텔링 하고 내일은 새 페이지로 가요.</div>` : `<div class="note">기준: 두 회차 연속 발음 85, 억양 80을 넘으면 다음 페이지로. 보통 5~10회 걸려요.</div>`}
+    ${last.say ? `<div class="fb"><div>${esc(last.say)}</div>${(last.tips || []).length ? `<ul style="margin:0;padding-left:18px">${last.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>` : ""}`;
+}
+function renderRead(){ renderRules(); renderFocus(); renderList(); renderRounds(); readSetMic(); }
+function readSetMic(){
+  if (O.tab !== "read") return;
+  const m = $("#mic"); m.disabled = false; m.classList.toggle("on", readOn);
+  $("#micLabel").textContent = readOn ? "멈추기" : !P ? "페이지를 먼저 준비하세요" : P.cur >= P.sents.length ? "회차 결과 정리" : P.cur > 0 ? `이어서 읽기 (문장 ${P.cur + 1}부터)` : `${P.rnd.n}회차 낭독 시작`;
+}
+function readStop(msg){ readOn = false; readLoop++; cancelListen(); stopSpeaking(); readSetMic(); if (msg != null) setStatus(msg); }
+function analyze(json, ref){
+  const nb = json && json.NBest && json.NBest[0]; if (!nb) return { ok:false };
+  const pa = nb.PronunciationAssessment || {};
+  const words = (nb.Words || []).map(w => {
+    const a = w.PronunciationAssessment || {};
+    const br = ((a.Feedback || {}).Prosody || {}).Break || {};
+    const badPh = (w.Phonemes || []).filter(p => (p.PronunciationAssessment || {}).AccuracyScore < 60).map(p => `/${p.Phoneme}/`);
+    return { w: w.Word, et: a.ErrorType || "None", acc: a.AccuracyScore ?? 100, brk: (br.ErrorTypes || []).includes("UnexpectedBreak"), ph: badPh };
+  });
+  const sc = { pron: pa.PronScore, acc: pa.AccuracyScore, flu: pa.FluencyScore, pros: pa.ProsodyScore, comp: pa.CompletenessScore };
+  const omit = words.filter(w => w.et === "Omission").length;
+  const weak = words.filter(w => w.et === "Mispronunciation" || (w.et === "None" && w.acc < 70)).map(w => w.w);
+  const low = words.filter(w => w.et !== "Omission" && w.et !== "Insertion" && (w.acc < 75 || w.ph.length)).slice(0, 4).map(w => `${w.w}(${r0(w.acc)}${w.ph.length ? " " + w.ph.join(" ") : ""})`).join(", ");
+  const good = (sc.comp ?? 0) >= 90 && (sc.pron ?? 0) >= 80;
+  return { ok:true, ref, words, sc, omit, weak, low, good, brks: words.filter(w => w.brk).length };
+}
+function recordSent(i, a){
+  if (!a.ok) return;
+  const cur = P.rnd.res[i];
+  if (!cur || (a.sc.pron ?? 0) >= cur.pron) P.rnd.res[i] = { pron: a.sc.pron ?? 0, acc: a.sc.acc ?? 0, flu: a.sc.flu ?? 0, pros: a.sc.pros ?? null, omit: a.omit, weak: a.weak.slice(0, 6), good: a.good };
+  saveP();
+}
+async function finishRound(){
+  const res = Object.values(P.rnd.res);
+  if (!res.length) { P.cur = 0; saveP(); renderRead(); return; }
+  const avg = k => { const v = res.map(r => r[k]).filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+  const weakCount = {}; res.forEach(r => r.weak.forEach(w => weakCount[w] = (weakCount[w] || 0) + 1));
+  const weak = Object.entries(weakCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
+  const round = { n: P.rnd.n, d: new Date().toLocaleDateString("en-CA"), cnt: res.length, pron: avg("pron"), acc: avg("acc"), flu: avg("flu"), pros: avg("pros"), omit: res.reduce((s, r) => s + r.omit, 0), weak };
+  P.rounds.push(round); P.rnd = { n: P.rnd.n + 1, res: {} }; P.cur = 0; lastAttempt = null; saveP(); upsertHist();
+  renderRead(); $("#roundBox").scrollIntoView({ behavior:"smooth", block:"start" });
+  await speak([{ lang:"ko", text: `${round.n}회차 끝. 평균 발음 ${Math.round(round.pron)}점이에요.` }]);
+  if (!store.get("gm_key", "")) return;
+  setStatus("코치 한마디 받는 중…");
+  try {
+    const rule = O.rule ? RULES.find(r => r[0] === O.rule)[1] : "없음";
+    const prevR = P.rounds[P.rounds.length - 2];
+    const r = await gemini(`너는 소리튜닝 코치야. 태원이 영어 소설 한 페이지(${P.sents.length}문장)를 ${round.n}회차 낭독했어. Azure 발음 채점 결과야.
+${COACH}
+오늘의 소리 규칙: ${rule}
+이번 평균: 발음 ${r0(round.pron)}, 정확도 ${r0(round.acc)}, 유창성 ${r0(round.flu)}, 억양 ${r0(round.pros)}, 빠뜨린 단어 ${round.omit}개
+지난 회차: ${prevR ? `발음 ${r0(prevR.pron)}, 억양 ${r0(prevR.pros)}` : "없음(첫 회차)"}
+자주 낮게 나온 단어: ${weak.join(", ") || "없음"}
+say: 한국어 2문장 이내, "태원님~"으로 시작, 칭찬 1개 + 고칠 것 1개.
+tips: 다음 회차에 집중할 것 2개. 위 단어 중 구체적인 단어를 넣어 한국어 한 문장씩.
+JSON 한 개만: {"say":"","tips":["",""]}`, [], 0.6);
+    round.say = r.say || ""; round.tips = (r.tips || []).slice(0, 2); saveP(); renderRounds(); setStatus("");
+    if (round.say) await speak([{ lang:"ko", text: round.say }]);
+  } catch(e) { setStatus(aiErrText(e)); }
+}
+async function readRun(){
+  if (!P) { setTab("page"); setStatus("먼저 오늘 페이지를 준비해 주세요."); return; }
+  if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("설정에서 Azure 키를 먼저 저장해 주세요."); return; }
+  if (P.cur >= P.sents.length) { await finishRound(); return; }
+  hideBanner(); picking = null;
+  const my = ++readLoop; readOn = true; readSetMic();
+  const alive = () => readOn && my === readLoop;
+  let tries = 0, lastI = -1;
+  while (alive()) {
+    const i = P.cur;
+    if (i >= P.sents.length) { readStop(null); await finishRound(); return; }
+    if (i !== lastI) { tries = 0; lastI = i; }
+    const s = P.sents[i];
+    renderFocus(); renderList();
+    synth([{ lang:"en", text: s.t }]);
+    if (O.shadow && tries === 0) { setStatus("원어민 소리 먼저 들어요"); await speak([{ lang:"en", text: s.t }]); if (!alive()) return; }
+    setStatus(tries ? "한 번 더 읽어 보세요" : "읽어 주세요");
+    let heard;
+    try { heard = await listenRead(s.t); }
+    catch(e) {
+      if (!alive() || e.kind === "cancel") return;
+      if (e.kind === "nomatch" && e.why === "silence") { readStop("10초 동안 조용해서 멈췄어요. 버튼을 누르면 이 문장부터 이어서 해요."); return; }
+      if (e.kind === "nomatch") { setStatus("잘 못 들었어요. 다시 읽어 주세요."); await sleep(600); continue; }
+      readStop(micErrText(e)); return;
+    }
+    if (!alive()) return;
+    const a = analyze(heard.json, s.t); a.i = i; a.audio = wavUrl(heard.chunks);
+    lastAttempt = a; recordSent(i, a);
+    renderFocus(); renderList();
+    if (a.ok && (a.good || tries >= 1)) {
+      P.cur = i + 1; saveP();
+      setStatus(a.good ? "좋아요. 다음 문장" : "다음 문장으로 넘어가요");
+      await sleep(a.good ? 700 : 1200);
+    } else {
+      tries++;
+      setStatus("원어민 소리 듣고 한 번 더");
+      await speak([{ lang:"en", text: s.t }]);
+    }
+  }
+}
+
+/* ---------- ③ 리텔링 (4/3/2) ---------- */
+const RET_LENS = { short:[60, 45, 30], normal:[120, 90, 60] };
+let ret = null;
+const fmtT = s => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, Math.ceil(s)) % 60).padStart(2, "0")}`;
+function retSetMic(){
+  if (O.tab !== "retell") return;
+  const m = $("#mic"); m.classList.toggle("on", !!ret); m.disabled = !!(ret && ret.ending);
+  const k = P ? (P.ret.res || []).length : 0, lens = RET_LENS[O.retLen];
+  $("#micLabel").textContent = ret ? (ret.ending ? "정리 중…" : "끝내기") : !P ? "페이지를 먼저 준비하세요" : k >= 3 ? "처음부터 다시 3번" : `${k + 1}번째 말하기 시작 · ${fmtT(lens[k])}`;
+}
+function renderRetell(){
+  $$("[data-len]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.len === O.retLen)); b.onclick = () => { if (ret) return; O.retLen = b.dataset.len; saveO(); renderRetell(); }; });
+  const k = P ? (P.ret.res || []).length : 0;
+  $$("#retSteps span").forEach((s, i) => s.className = i < k ? "done" : i === k ? "now" : "");
+  if (!ret) $("#retTimer").textContent = fmtT(RET_LENS[O.retLen][Math.min(k, 2)]);
+  renderRetFb(); retSetMic();
+}
+async function retStart(){
+  if (!P) { setTab("page"); setStatus("먼저 오늘 페이지를 준비해 주세요."); return; }
+  if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("설정에서 Azure 키를 먼저 저장해 주세요."); return; }
+  if ((P.ret.res || []).length >= 3) { P.ret = { res: [], fb: null }; saveP(); }
+  const k = P.ret.res.length, limit = RET_LENS[O.retLen][k];
+  const cfg = baseCfg(); if (!cfg) { setStatus("Azure 설정을 확인해 주세요."); return; }
+  stopSpeaking();
+  let c; try { c = await startCapture(); } catch(e) { setStatus(micErrText({ kind:"mic" })); return; }
+  const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(c.push));
+  const st = { rec, c, texts: [], partial: "", t0: Date.now(), limit, ending: false, timer: null };
+  st.stopped = new Promise(r => { rec.sessionStopped = () => r(); rec.canceled = () => r(); });
+  rec.recognizing = (s, e) => { st.partial = e.result.text || ""; retLive(st); };
+  rec.recognized = (s, e) => { if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) { st.texts.push(e.result.text); st.partial = ""; retLive(st); } };
+  ret = st; renderRetell(); setStatus("말씀하세요. 멈추지 말고 끝까지!");
+  $("#retLive").textContent = "…";
+  rec.startContinuousRecognitionAsync(() => {}, err => { setStatus("Azure 연결 문제예요: " + err); retFinish(); });
+  st.timer = setInterval(() => {
+    const left = st.limit - (Date.now() - st.t0) / 1000;
+    $("#retTimer").textContent = fmtT(left);
+    if (left <= 0) retFinish();
+  }, 250);
+}
+function retLive(st){ $("#retLive").textContent = (st.texts.join(" ") + " " + st.partial).trim() || "…"; }
+async function retFinish(){
+  const st = ret; if (!st || st.ending) return;
+  st.ending = true; clearInterval(st.timer); retSetMic(); setStatus("마무리하는 중…");
+  const sec = Math.min(st.limit, (Date.now() - st.t0) / 1000);
+  stopCapture(st.c);
+  await Promise.race([st.stopped, sleep(4000)]);
+  try { st.rec.stopContinuousRecognitionAsync(() => {}, () => {}); } catch(e) {}
+  await sleep(150); try { st.rec.close(); } catch(e) {}
+  ret = null;
+  const text = st.texts.concat(st.partial ? [st.partial] : []).join(" ").trim();
+  if (!P || O.tab !== "retell" && !text) { renderRetell(); return; }
+  if (!text) { setStatus("말소리가 들리지 않았어요. 다시 해 주세요."); renderRetell(); return; }
+  const words = wordsOf(text).length, wpm = Math.round(words / Math.max(sec, 1) * 60);
+  P.ret.res.push({ sec: Math.round(sec), words, wpm, text, audio: null });
+  st.audioUrl = wavUrl(st.c.chunks); retAudio[P.ret.res.length - 1] = st.audioUrl;
+  saveP(); upsertHist(); renderRetell(); setStatus("");
+  if (P.ret.res.length === 1) await retFeedback();
+  else if (P.ret.res.length === 3) await speak([{ lang:"ko", text:"세 번 다 했어요. 단어 수와 속도를 비교해 보세요." }]);
+}
+const retAudio = {};
+async function retFeedback(){
+  if (!store.get("gm_key", "")) return;
+  const r1 = P.ret.res[0];
+  $("#retFb").hidden = false; $("#retFb").innerHTML = `<div class="note">코치가 고쳐 보는 중이에요…</div>`;
+  try {
+    const r = await gemini(`너는 한국인 학습자(태원)의 영어 말하기 코치야. 태원이 영어 소설 한 페이지를 읽은 뒤, 책을 덮고 ${r1.sec}초 동안 내용을 영어로 다시 말했어(Azure 받아쓰기라 오타가 있을 수 있어).
+태원은 아직 머릿속으로 번역하며 말하는 단계라, 어려운 표현 말고 바로 따라 말할 수 있는 수준으로 도와줘.
+원문:
+${P.sents.map(s => s.t).join(" ")}
+태원의 말:
+${r1.text}
+
+- natural: 태원이 말한 내용과 순서를 살려 자연스럽게 고친 버전. 태원 수준보다 살짝 위, 쉬운 단어, ${Math.max(3, Math.min(7, Math.round(r1.words / 12) + 2))}문장 이내. 강세 내용어는 대문자, 연음 경계는 ‿.
+- expressions: 태원이 막혔거나 어색했던 곳에 바로 쓸 표현 3개. en(짧은 구), ko(한국어 뜻), why(한국어 한 문장).
+- missed: 원문에서 빠뜨린 중요한 내용 최대 2개(한국어 한 문장씩). 없으면 [].
+- say: 한국어 2문장 이내, "태원님~"으로 시작, 칭찬 1개 + 다음 번에 할 것 1개.
+JSON 한 개만: {"natural":"","expressions":[{"en":"","ko":"","why":""}],"missed":[],"say":""}`, [], 0.6);
+    P.ret.fb = { natural: r.natural || "", expressions: (r.expressions || []).slice(0, 3), missed: (r.missed || []).slice(0, 2), say: r.say || "" };
+    saveP(); renderRetFb();
+    if (P.ret.fb.say) await speak([{ lang:"ko", text: P.ret.fb.say }]);
+  } catch(e) { $("#retFb").innerHTML = `<div class="note">${esc(aiErrText(e))}</div>`; }
+}
+function renderRetFb(){
+  const box = $("#retFb");
+  if (!P || !(P.ret.res || []).length) { box.hidden = true; return; }
+  box.hidden = false;
+  const res = P.ret.res, fb = P.ret.fb;
+  const used = fb ? fb.expressions.filter(x => res.slice(1).some(r => wordsOf(r.text).join(" ").includes(wordsOf(x.en).join(" ")))).length : 0;
+  box.innerHTML = `<div class="lbl">말하기 기록</div>
+    <table class="t"><tr><th>회</th><th>시간</th><th>단어</th><th>WPM</th><th></th></tr>
+    ${res.map((r, i) => `<tr><td>${i + 1}번째</td><td>${r.sec}초</td><td>${r.words}</td><td>${r.wpm}</td><td>${retAudio[i] ? `<button class="again" data-play="${esc(retAudio[i])}">▶</button>` : ""}</td></tr>`).join("")}</table>
+    <details><summary class="sub">받아쓴 내 말 보기</summary>${res.map((r, i) => `<div class="note"><b>${i + 1}.</b> ${esc(r.text)}</div>`).join("")}</details>
+    ${fb ? `<div class="fb">
+      ${fb.say ? `<div>${esc(fb.say)}</div>` : ""}
+      <div class="lbl">이렇게 말하면 자연스러워요 · 소리 내 3번 읽고 다음 번에 써 보세요</div>
+      <div class="sent">${markup(fb.natural)}</div>
+      <div class="row"><button class="again" data-say="${esc(plain(fb.natural))}">▶ 듣기</button></div>
+      ${fb.expressions.map((x, i) => `<div class="expr"><span class="tag">R</span><div class="body"><span class="en">${esc(x.en)}</span><span class="sub">${esc(x.ko)} · ${esc(x.why)}</span></div><button class="again" data-saveret="${i}">저장</button></div>`).join("")}
+      ${fb.missed.length ? `<div class="note">빠뜨린 내용: ${fb.missed.map(esc).join(" / ")}</div>` : ""}
+    </div>` : ""}
+    ${res.length >= 3 ? `<div class="rulenote">3번 완료: 단어 ${res[0].words}→${res[2].words}, 속도 ${res[0].wpm}→${res[2].wpm} WPM${fb ? ` · 교정 표현 ${used}/${fb.expressions.length}개 사용` : ""}. 시간이 줄어도 단어 수가 비슷하면 그만큼 빨라진 거예요.</div>` : ""}`;
+  box.querySelectorAll("[data-saveret]").forEach(b => b.onclick = () => {
+    const x = fb.expressions[+b.dataset.saveret];
+    addExpr({ tag:"R", en: x.en, ko: x.ko, ctx: plain(fb.natural), src: P.label + " 리텔링" });
+    b.textContent = "저장됨"; b.disabled = true;
+  });
+}
+
+/* ---------- ④ 표현 ---------- */
+function exprs(){ return store.get("rd_expr", []); }
+function addExpr(x){
+  const l = exprs();
+  if (l.some(y => y.en.toLowerCase() === x.en.toLowerCase())) return;
+  l.unshift({ ...x, t: Date.now() }); store.set("rd_expr", l.slice(0, 500));
+}
+function renderExpr(){
+  const l = exprs();
+  $("#exCount").textContent = `저장한 표현 ${l.length}개`;
+  $("#exList").innerHTML = l.length ? l.map((x, i) => `<div class="expr"><span class="tag ${x.tag === "?" ? "q" : x.tag === "E" ? "e" : ""}">${esc(x.tag)}</span>
+    <div class="body"><span class="en">${esc(x.en)}</span>${x.ko ? `<span class="ko">${esc(x.ko)}</span>` : ""}<span class="sub">${esc(x.ctx)}</span><span class="sub">${esc(x.src || "")}</span></div>
+    <button class="again" data-say="${esc(x.en)}">▶</button><button class="x" data-del="${i}" aria-label="삭제">×</button></div>`).join("")
+    : `<div class="note">아직 없어요. ② 낭독에서 '✎ 표현 저장'을 누르거나 ③ 리텔링 교정 표현을 저장하세요.</div>`;
+  $$("[data-del]").forEach(b => b.onclick = () => { const l2 = exprs(); l2.splice(+b.dataset.del, 1); store.set("rd_expr", l2); renderExpr(); });
+}
+$("#exClear").onclick = () => { if (!exprs().length) return; if (confirm("저장한 표현을 모두 지울까요? (내보내기를 먼저 했는지 확인하세요)")) { store.set("rd_expr", []); renderExpr(); } };
+async function fillKo(){
+  const l = exprs(), need = l.map((x, i) => ({ x, i })).filter(o => !o.x.ko).slice(0, 40);
+  if (!need.length) return true;
+  setStatus("한국어 뜻 채우는 중…");
+  const r = await gemini(`각 영어 표현이 주어진 원문 문장에서 쓰인 뜻을 자연스러운 한국어로 짧게 적어.
+${need.map((o, k) => `${k + 1}. 표현: ${o.x.en} / 문장: ${o.x.ctx}`).join("\n")}
+순서와 개수를 그대로 지켜. JSON 한 개만: {"ko":["",""]}`, [], 0.3);
+  (r.ko || []).forEach((k, j) => { if (need[j] && k) l[need[j].i].ko = String(k); });
+  store.set("rd_expr", l); setStatus(""); return true;
+}
+$("#exFill").onclick = async () => { try { await fillKo(); renderExpr(); } catch(e) { setStatus(aiErrText(e)); } };
+$("#exCsv").onclick = async () => {
+  if (!exprs().length) { setStatus("내보낼 표현이 없어요."); return; }
+  if (store.get("gm_key", "") && exprs().some(x => !x.ko)) { try { await fillKo(); } catch(e) {} }
+  const q = s => `"${String(s ?? "").replace(/"/g, '""')}"`;
+  const rows = exprs().map(x => [x.ko || "(뜻 없음)", `${x.en}<br><small>${esc(x.ctx)}</small>`, x.src || "", "원서낭독 " + (x.tag === "?" ? "모르는표현" : x.tag === "E" ? "알아둘표현" : "리텔링교정")]);
+  const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+  a.download = `낭독표현_${new Date().toLocaleDateString("en-CA")}.csv`;
+  document.body.append(a); a.click(); a.remove();
+  renderExpr(); setStatus("CSV를 만들었어요. Anki에서 파일 → 가져오기로 넣으세요 (필드 순서: 앞면, 뒷면, 출처, 태그).");
+};
+
+/* ---------- 마이크 버튼 ---------- */
+$("#mic").onclick = async () => {
+  if (O.tab === "read") { if (readOn) readStop("멈췄어요. 버튼을 누르면 이어서 해요."); else readRun(); return; }
+  if (O.tab === "retell") { if (ret) retFinish(); else retStart(); }
+};
+
+loadSettings(); renderMeter(); setTab(O.tab);
+if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("처음 한 번만 키를 저장해 주세요. (낭독 채점은 Azure, 페이지 정리·코치는 Gemini)"); }
+</script>
+</body>
+</html>
