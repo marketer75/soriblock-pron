@@ -115,6 +115,23 @@ table.t th{color:var(--ink3);font-weight:600;font-size:11.5px}
 .mic.on .dot{animation:blink 1s infinite}
 @keyframes blink{50%{opacity:.2}}
 .status{font-size:13px;color:var(--ink2);text-align:center;min-height:1.2em}
+.plan{display:flex;gap:4px}
+.plan span{flex:1;font-family:var(--mono);font-size:11px;text-align:center;padding:4px 0;border-radius:7px;background:var(--surface2);color:var(--ink3);border:1px solid var(--line)}
+.plan span.w{border-style:dashed}
+.plan span.done{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.plan span.now{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.page{font-family:var(--mono);font-size:15.5px;line-height:1.85;word-break:break-word}
+.page .sx{display:inline}
+.page .s{color:var(--stress);background:var(--stress-soft);border-radius:4px;padding:0 2px;font-weight:600}
+.page .l{color:var(--accent);font-weight:600}
+.page .sn{font-size:10.5px;color:var(--ink3);vertical-align:super;margin-right:2px}
+.qa{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}
+.qa:last-child{border-bottom:0}
+.qa .qn{font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.qa .qe{font-weight:600;font-size:16px}
+.qa.cur{background:var(--accent-soft);border-radius:12px;padding:10px;border-bottom:0}
+.mine{font-size:14px;color:var(--ink2);border-left:3px solid var(--line);padding-left:9px}
+details summary{cursor:pointer}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -141,7 +158,7 @@ table.t th{color:var(--ink3);font-weight:600;font-size:11.5px}
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="page">① 페이지</button>
     <button role="tab" data-tab="read">② 낭독</button>
-    <button role="tab" data-tab="retell">③ 리텔링</button>
+    <button role="tab" data-tab="retell">③ 말하기</button>
     <button role="tab" data-tab="expr">④ 표현</button>
   </nav>
 
@@ -173,26 +190,38 @@ table.t th{color:var(--ink3);font-weight:600;font-size:11.5px}
         <button class="chip" id="optShadow">문장마다 원어민 먼저 듣기</button>
         <button class="chip" id="optKo">한국어 뜻 보기</button>
       </div>
-      <div class="note">오디오북으로 먼저 듣고 따라 했다면, 여기서는 <b>혼자 읽기</b>로 채점받으세요. 버튼을 누르면 문장마다 자동으로 넘어가요.</div>
+      <div class="lbl">이번 회차 방식</div>
+      <div class="chips"><button class="chip" data-rmode="sent">문장별</button><button class="chip" data-rmode="whole">쭉 읽기</button></div>
+      <div class="plan" id="plan"></div>
+      <div class="note">오디오북으로 먼저 듣고 따라 했다면, 여기서는 <b>혼자 읽기</b>로 채점받으세요.</div>
     </div>
     <div class="card" id="focus"></div>
     <div class="card" id="roundBox" hidden></div>
-    <div class="card"><div class="lbl">페이지 전체 · 탭하면 그 문장부터</div><ol class="slist" id="slist"></ol></div>
+    <div class="card" id="listCard"><div class="lbl">페이지 전체 · 탭하면 그 문장부터</div><ol class="slist" id="slist"></ol></div>
   </section>
 
   <!-- ③ 리텔링 -->
   <section id="secRetell" hidden>
     <div class="card">
-      <div class="lbl">책 덮고 내 말로 말하기 · 같은 내용을 3번, 점점 짧게</div>
-      <div class="chips">
-        <button class="chip" data-len="short">짧게 60 → 45 → 30초</button>
-        <button class="chip" data-len="normal">보통 2:00 → 1:30 → 1:00</button>
-      </div>
-      <div class="steps" id="retSteps"><span></span><span></span><span></span></div>
-      <div class="timer" id="retTimer">0:60</div>
-      <div class="live" id="retLive">책을 덮고, 떠오르는 영어 키워드 서너 개만 머릿속에 정한 뒤 시작하세요. 막히면 쉬운 단어로 돌려 말하고, 멈추지 말고 끝까지 가세요.</div>
+      <div class="lbl">책 덮고 말하기</div>
+      <div class="chips"><button class="chip" data-smode="q">질문 3개에 답하기</button><button class="chip" data-smode="re">다시 말하기 3번</button></div>
     </div>
-    <div class="card" id="retFb" hidden></div>
+    <div id="modeQ">
+      <div class="card" id="qaBox"></div>
+    </div>
+    <div id="modeRe" hidden>
+      <div class="card">
+        <div class="lbl">같은 내용을 3번, 점점 짧게</div>
+        <div class="chips">
+          <button class="chip" data-len="short">1페이지 45 → 30 → 20초</button>
+          <button class="chip" data-len="normal">길게 60 → 45 → 30초</button>
+        </div>
+        <div class="steps" id="retSteps"><span></span><span></span><span></span></div>
+        <div class="timer" id="retTimer">0:45</div>
+        <div class="live" id="retLive">책을 덮고, 떠오르는 영어 키워드 서너 개만 머릿속에 정한 뒤 시작하세요. 막히면 쉬운 단어로 돌려 말하고, 멈추지 말고 끝까지 가세요.</div>
+      </div>
+      <div class="card" id="retFb" hidden></div>
+    </div>
   </section>
 
   <!-- ④ 표현 -->
@@ -239,7 +268,7 @@ const store = {
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const O = Object.assign({ tab:"page", shadow:false, ko:false, rule:"", retLen:"short" }, store.get("rd_opt", {}));
+const O = Object.assign({ tab:"page", shadow:false, ko:false, rule:"", retLen:"short", smode:"q" }, store.get("rd_opt", {}));
 const saveO = () => store.set("rd_opt", O);
 let P = store.get("rd_page", null);   // 오늘 페이지 (본문은 이 폰에만)
 const saveP = () => store.set("rd_page", P);
@@ -568,7 +597,9 @@ function setTab(t){
   $("#secPage").hidden = t !== "page"; $("#secRead").hidden = t !== "read"; $("#secRetell").hidden = t !== "retell"; $("#secExpr").hidden = t !== "expr";
   $("#dock").hidden = !(t === "read" || t === "retell");
   if (t !== "read" && readOn) readStop("");
+  if (t !== "read" && whole) wholeFinish();
   if (t !== "retell" && ret) retFinish();
+  if (t !== "retell" && qaOn) qaStop("");
   if (t === "page") renderPage(); if (t === "read") renderRead(); if (t === "retell") renderRetell(); if (t === "expr") renderExpr();
   setStatus(""); window.scrollTo({ top: 0 });
 }
@@ -618,6 +649,7 @@ JSON 한 개만: {"s":["문장1","문장2"]}${text ? "\n\n텍스트:\n" + text :
       .filter(t => wordsOf(t).length).map(t => ({ t, a: t, ko: "" }));
     if (!sents.length) throw { kind:"other", msg:"글자를 찾지 못했어요. 페이지가 화면에 꽉 차게, 밝은 곳에서 다시 찍어 주세요." };
     if (P && P.rounds.length) upsertHist();
+    if (P && P.sents) { const cx = store.get("rd_ctx", []).filter(x => x.id !== P.id); cx.unshift({ id: P.id, label: P.label, text: P.sents.map(x => x.t).join(" ") }); store.set("rd_ctx", cx.slice(0, 4)); }
     P = { id: Date.now().toString(36), label, date: new Date().toLocaleDateString("en-CA"), sents, rules: {}, cur: 0, rnd: { n: 1, res: {} }, rounds: [], ret: { res: [], fb: null }, annot: "pending" };
     saveP(); upsertHist(); stop(); hideBanner();
     $("#pgText").value = ""; $("#pgText").hidden = true; $("#pgPasteGo").hidden = true; $("#pgLabel").value = "";
@@ -776,21 +808,39 @@ function renderRounds(){
   if (!P || !P.rounds.length) { box.hidden = true; return; }
   box.hidden = false;
   const rs = P.rounds, last = rs[rs.length - 1], prev = rs[rs.length - 2];
-  const ready = rs.length >= 2 && rs.slice(-2).every(r => r.pron >= 85 && (r.pros == null || r.pros >= 80));
+  const doneAll = rs.length >= PLAN.sent + PLAN.whole;
   box.innerHTML = `<div class="lbl">회차별 기록 · 이 페이지</div>
     <table class="t"><tr><th>회차</th><th>발음</th><th>정확도</th><th>유창성</th><th>억양</th><th>빠뜨림</th></tr>
-    ${rs.map(r => `<tr><td>${r.n}회</td><td>${r0(r.pron)}</td><td>${r0(r.acc)}</td><td>${r0(r.flu)}</td><td>${r0(r.pros)}</td><td>${r.omit}</td></tr>`).join("")}</table>
+    ${rs.map(r => `<tr><td>${r.n}회${r.mode === "whole" ? " 쭉" : ""}</td><td>${r0(r.pron)}</td><td>${r0(r.acc)}</td><td>${r0(r.flu)}</td><td>${r0(r.pros)}</td><td>${r.omit}</td></tr>`).join("")}</table>
     ${prev ? `<div class="note">지난 회차보다 발음 ${last.pron - prev.pron >= 0 ? "+" : ""}${r0(last.pron - prev.pron)} · 억양 ${last.pros != null && prev.pros != null ? (last.pros - prev.pros >= 0 ? "+" : "") + r0(last.pros - prev.pros) : "-"}</div>` : ""}
-    ${ready ? `<div class="rulenote">두 회차 연속 발음 85·억양 80을 넘었어요. 이 페이지는 충분해요. ③ 리텔링 하고 내일은 새 페이지로 가요.</div>` : `<div class="note">기준: 두 회차 연속 발음 85, 억양 80을 넘으면 다음 페이지로. 보통 5~10회 걸려요.</div>`}
+    ${doneAll ? `<div class="rulenote">계획한 ${PLAN.sent + PLAN.whole}회를 다 읽었어요. ③ 말하기에서 질문에 답하고, 내일은 새 페이지로 가요.</div>` : `<div class="note">계획: 1~${PLAN.sent}회 문장별 → ${PLAN.sent + 1}~${PLAN.sent + PLAN.whole}회 쭉 읽기. 쭉 읽기는 멈추지 말고 끝까지 읽는 게 목표예요.</div>`}
     ${last.say ? `<div class="fb"><div>${esc(last.say)}</div>${(last.tips || []).length ? `<ul style="margin:0;padding-left:18px">${last.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>` : ""}`;
 }
-function renderRead(){ renderRules(); renderFocus(); renderList(); renderRounds(); readSetMic(); }
+const PLAN = { sent: 5, whole: 2 };
+function roundMode(){ if (!P) return "sent"; return P.rnd.mode || (P.rnd.n > PLAN.sent ? "whole" : "sent"); }
+function renderPlan(){
+  const m = roundMode();
+  $$("[data-rmode]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.rmode === m)); b.onclick = () => {
+    if (!P || readOn || whole) return;
+    if (Object.keys(P.rnd.res).length && b.dataset.rmode !== m) { setStatus("이번 회차를 문장별로 읽던 중이에요. 이번 회차를 끝낸 뒤 바꿀 수 있어요."); return; }
+    P.rnd.mode = b.dataset.rmode; P.cur = 0; lastAttempt = null; saveP(); renderRead(); }; });
+  const n = P ? P.rnd.n : 1, tot = PLAN.sent + PLAN.whole;
+  $("#plan").innerHTML = Array.from({ length: tot }, (_, i) => `<span class="${i >= PLAN.sent ? "w " : ""}${i + 1 < n ? "done" : i + 1 === n ? "now" : ""}">${i + 1}${i >= PLAN.sent ? " 쭉" : ""}</span>`).join("");
+}
+function renderRead(){
+  renderRules(); renderPlan();
+  const w = roundMode() === "whole";
+  $("#listCard").hidden = w;
+  if (w) renderWholeFocus(); else { renderFocus(); renderList(); }
+  renderRounds(); readSetMic();
+}
 function readSetMic(){
   if (O.tab !== "read") return;
   const m = $("#mic"); m.disabled = false; m.classList.toggle("on", readOn);
-  $("#micLabel").textContent = readOn ? "멈추기" : !P ? "페이지를 먼저 준비하세요" : P.cur >= P.sents.length ? "회차 결과 정리" : P.cur > 0 ? `이어서 읽기 (문장 ${P.cur + 1}부터)` : `${P.rnd.n}회차 낭독 시작`;
+  if (whole) return;
+  $("#micLabel").textContent = readOn ? "멈추기" : !P ? "페이지를 먼저 준비하세요" : roundMode() === "whole" ? `${P.rnd.n}회차 쭉 읽기 시작` : P.cur >= P.sents.length ? "회차 결과 정리" : P.cur > 0 ? `이어서 읽기 (문장 ${P.cur + 1}부터)` : `${P.rnd.n}회차 문장별 낭독 시작`;
 }
-function goSignal(on){ $("#mic").classList.toggle("go", on); const f = $("#focus"); if (f) f.classList.toggle("go", on); if (on) $("#micLabel").textContent = "● 지금 읽으세요"; else readSetMic(); }
+function goSignal(on, label){ $("#mic").classList.toggle("go", on); const f = $("#focus"); if (f) f.classList.toggle("go", on); if (on) $("#micLabel").textContent = label || "● 지금 읽으세요"; else readSetMic(); }
 function readStop(msg){ readOn = false; readLoop++; cancelListen(); stopSpeaking(); closeMic(); goSignal(false); readSetMic(); if (msg != null) setStatus(msg); }
 function analyze(json, ref){
   const nb = json && json.NBest && json.NBest[0]; if (!nb) return { ok:false };
@@ -820,21 +870,24 @@ async function finishRound(){
   const avg = k => { const v = res.map(r => r[k]).filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
   const weakCount = {}; res.forEach(r => r.weak.forEach(w => weakCount[w] = (weakCount[w] || 0) + 1));
   const weak = Object.entries(weakCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
-  const round = { n: P.rnd.n, d: new Date().toLocaleDateString("en-CA"), cnt: res.length, pron: avg("pron"), acc: avg("acc"), flu: avg("flu"), pros: avg("pros"), omit: res.reduce((s, r) => s + r.omit, 0), weak };
+  const round = { n: P.rnd.n, mode: "sent", d: new Date().toLocaleDateString("en-CA"), cnt: res.length, pron: avg("pron"), acc: avg("acc"), flu: avg("flu"), pros: avg("pros"), omit: res.reduce((s, r) => s + r.omit, 0), weak };
   P.rounds.push(round); P.rnd = { n: P.rnd.n + 1, res: {} }; P.cur = 0; lastAttempt = null; saveP(); upsertHist();
   renderRead(); $("#roundBox").scrollIntoView({ behavior:"smooth", block:"start" });
   await speak([{ lang:"ko", text: `${round.n}회차 끝. 평균 발음 ${Math.round(round.pron)}점이에요.` }]);
+  await coachRound(round);
+}
+async function coachRound(round){
   if (!store.get("gm_key", "")) return;
   setStatus("코치 한마디 받는 중…");
   try {
     const rule = O.rule ? RULES.find(r => r[0] === O.rule)[1] : "없음";
     const prevR = P.rounds[P.rounds.length - 2];
-    const r = await gemini(`너는 소리튜닝 코치야. 태원이 영어 소설 한 페이지(${P.sents.length}문장)를 ${round.n}회차 낭독했어. Azure 발음 채점 결과야.
+    const r = await gemini(`너는 소리튜닝 코치야. 태원이 영어 소설 한 페이지(${P.sents.length}문장)를 ${round.n}회차 ${round.mode === "whole" ? "처음부터 끝까지 멈추지 않고 쭉" : "문장별로"} 낭독했어. Azure 발음 채점 결과야.
 ${COACH}
 오늘의 소리 규칙: ${rule}
 이번 평균: 발음 ${r0(round.pron)}, 정확도 ${r0(round.acc)}, 유창성 ${r0(round.flu)}, 억양 ${r0(round.pros)}, 빠뜨린 단어 ${round.omit}개
 지난 회차: ${prevR ? `발음 ${r0(prevR.pron)}, 억양 ${r0(prevR.pros)}` : "없음(첫 회차)"}
-자주 낮게 나온 단어: ${weak.join(", ") || "없음"}
+자주 낮게 나온 단어: ${(round.weak || []).join(", ") || "없음"}
 say: 한국어 2문장 이내, "태원님~"으로 시작, 칭찬 1개 + 고칠 것 1개.
 tips: 다음 회차에 집중할 것 2개. 위 단어 중 구체적인 단어를 넣어 한국어 한 문장씩.
 JSON 한 개만: {"say":"","tips":["",""]}`, [], 0.6);
@@ -886,17 +939,284 @@ async function readRun(){
   }
 }
 
-/* ---------- ③ 리텔링 (4/3/2) ---------- */
-const RET_LENS = { short:[60, 45, 30], normal:[120, 90, 60] };
+/* ---------- 쭉 읽기 (페이지 전체를 한 번에 듣고 채점) ---------- */
+let whole = null, wholeAudio = "";
+function pageTokens(){
+  const out = [];
+  P.sents.forEach((s, si) => s.t.split(/\s+/).filter(Boolean).forEach(d => out.push({ si, d, n: wordsOf(d).join(" ") })));
+  return out;
+}
+function seqAlign(a, b){   // a=원문 단어, b=들린 단어 → 원문 기준 짝
+  const n = a.length, m = b.length, D = Array.from({ length: n + 1 }, (_, i) => { const r = new Uint32Array(m + 1); r[0] = i; return r; });
+  for (let j = 0; j <= m; j++) D[0][j] = j;
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) D[i][j] = Math.min(D[i-1][j] + 1, D[i][j-1] + 1, D[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  const map = new Array(n).fill(null); let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (D[i][j] === D[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)) { map[i-1] = { j: j-1, same: a[i-1] === b[j-1] }; i--; j--; }
+    else if (D[i][j] === D[i-1][j] + 1) i--; else j--;
+  }
+  return map;
+}
+function analyzeWhole(segs){
+  const rec = []; let fw = 0, pw = 0, fs = 0, ps = 0;
+  segs.forEach(j => {
+    const nb = j && j.NBest && j.NBest[0]; if (!nb) return;
+    const pa = nb.PronunciationAssessment || {}, dur = Math.max(1, (j.Duration || 0) / 1e7 || (nb.Words || []).length);
+    if (pa.FluencyScore != null) { fs += pa.FluencyScore * dur; fw += dur; }
+    if (pa.ProsodyScore != null) { ps += pa.ProsodyScore * dur; pw += dur; }
+    (nb.Words || []).forEach(w => {
+      const a = w.PronunciationAssessment || {}; const br = ((a.Feedback || {}).Prosody || {}).Break || {};
+      if (a.ErrorType === "Omission" || a.ErrorType === "Insertion") return;
+      rec.push({ n: wordsOf(w.Word).join(" "), acc: a.AccuracyScore ?? 100, brk: (br.ErrorTypes || []).includes("UnexpectedBreak"), w: w.Word });
+    });
+  });
+  if (!rec.length) return { ok:false };
+  const toks = pageTokens(), idx = toks.map((t, k) => t.n ? k : -1).filter(k => k >= 0);
+  const map = seqAlign(idx.map(k => toks[k].n), rec.map(r => r.n));
+  idx.forEach((k, q) => {
+    const mm = map[q], t = toks[k];
+    if (!mm) { t.st = "omit"; return; }
+    const r = rec[mm.j]; t.acc = mm.same ? r.acc : Math.min(r.acc, 50); t.brk = r.brk;
+    t.st = !mm.same || t.acc < 70 ? "mis" : "ok";
+  });
+  // 원문 마지막 부분을 안 읽고 끝냈으면 그 뒤는 빠뜨림이 아니라 '안 읽음'
+  let lastRead = -1; idx.forEach(k => { if (toks[k].st !== "omit") lastRead = k; });
+  toks.forEach((t, k) => { if (t.st === "omit" && k > lastRead) t.st = "skip"; });
+  const scored = toks.filter(t => t.n && t.st !== "skip");
+  const okW = scored.filter(t => t.st !== "omit");
+  const acc = okW.length ? okW.reduce((s, t) => s + t.acc, 0) / okW.length : 0;
+  const comp = scored.length ? okW.length / scored.length * 100 : 0;
+  const flu = fw ? fs / fw : null, pros = pw ? ps / pw : null;
+  const pron = 0.4 * acc + 0.2 * (flu ?? acc) + 0.2 * (pros ?? acc) + 0.2 * comp;
+  const sents = P.sents.map((_, si) => { const ts = toks.filter(t => t.si === si && t.n); const sk = ts.every(t => t.st === "skip"); const om = ts.filter(t => t.st === "omit").length; const ac = ts.filter(t => t.acc != null); return { sk, om, acc: ac.length ? ac.reduce((s, t) => s + t.acc, 0) / ac.length : null }; });
+  const weak = [...new Set(toks.filter(t => t.st === "mis").map(t => t.n))].slice(0, 8);
+  return { ok:true, toks: toks.map(t => ({ d: t.d, si: t.si, st: t.st || "ok", brk: !!t.brk })), sc: { pron, acc, flu, pros, comp }, omit: toks.filter(t => t.st === "omit").length, unread: toks.filter(t => t.st === "skip" && t.n).length, brks: toks.filter(t => t.brk).length, weak, sents };
+}
+function pageHtml(){
+  return P.sents.map((s, i) => `<span class="sx"><span class="sn">${i + 1}</span>${markup(s.a || s.t)}</span>`).join(" ");
+}
+function wholeResultHtml(wr){
+  if (!wr) return "";
+  let prevSi = -1;
+  const body = wr.toks.map(t => {
+    const pre = (t.si !== prevSi ? `<span class="sn">${t.si + 1}</span>` : "") + (t.brk ? `<span class="brk" title="여기서 끊김">|</span>` : ""); prevSi = t.si;
+    const cls = t.st === "omit" ? "w-omit" : t.st === "mis" ? "w-mis" : t.st === "skip" ? "w-ins" : "";
+    return pre + (cls ? `<span class="${cls}">${esc(t.d)}</span>` : esc(t.d));
+  }).join(" ");
+  const worst = wr.sents.map((x, i) => ({ ...x, i })).filter(x => !x.sk && (x.om || (x.acc != null && x.acc < 80))).sort((a, b) => (b.om - a.om) || (a.acc - b.acc)).slice(0, 3);
+  return `<div class="fb">
+    <span class="verdict ${wr.sc.pron >= 85 ? "v-pass" : wr.sc.pron >= 70 ? "v-close" : "v-retry"}">${wr.n}회차 쭉 읽기 결과</span>
+    <div class="scores"><span>발음 <b>${r0(wr.sc.pron)}</b></span><span>정확도 <b>${r0(wr.sc.acc)}</b></span><span>유창성 <b>${r0(wr.sc.flu)}</b></span><span>억양 <b>${r0(wr.sc.pros)}</b></span><span>완성도 <b>${r0(wr.sc.comp)}</b></span></div>
+    <div class="note">빠뜨린 단어 ${wr.omit}개 · 어색하게 끊긴 곳 ${wr.brks}곳${wr.unread ? ` · 끝부분 ${wr.unread}단어는 안 읽음` : ""}</div>
+    <div class="page">${body}</div>
+    <div class="legend"><span><span class="w-omit">빠뜨림</span></span><span><span class="w-mis">발음</span></span><span><span class="brk">|</span> 어색하게 끊김</span><span><span class="w-ins">안 읽음</span></span></div>
+    ${worst.length ? `<div class="note">다시 볼 문장: ${worst.map(x => `<button class="again" data-say="${esc(P.sents[x.i].t)}">▶ ${x.i + 1}번</button>`).join(" ")}</div>` : ""}
+    ${wholeAudio && wr.fresh ? `<div class="row"><button class="again" data-play="${esc(wholeAudio)}">▶ 내 낭독 전체 듣기</button></div>` : ""}
+  </div>`;
+}
+function renderWholeFocus(){
+  const f = $("#focus");
+  if (!P) { renderFocus(); return; }
+  const wr = P.lastWhole;
+  f.innerHTML = `<div class="row between"><span class="sub">${esc(P.label)} · ${P.rnd.n}회차 · 쭉 읽기</span><button class="again" id="wNative">▶ 원어민 전체</button></div>
+    <div class="note">버튼을 누르고 삐 소리가 나면 첫 문장부터 끝까지 멈추지 말고 읽으세요. 틀려도 되돌아가지 말고 계속 가요. 다 읽으면 버튼을 누르거나, 8초 동안 조용하면 자동으로 끝나요.</div>
+    <div class="page">${pageHtml()}</div>
+    ${wr ? wholeResultHtml(wr) : ""}`;
+  $("#wNative").onclick = () => speak([{ lang:"en", text: P.sents.map(s => s.t).join(" ") }]);
+}
+async function wholeStart(){
+  if (!P) { setTab("page"); setStatus("먼저 오늘 페이지를 준비해 주세요."); return; }
+  if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("설정에서 Azure 키를 먼저 저장해 주세요."); return; }
+  const cfg = baseCfg(); if (!cfg) { setStatus("Azure 설정을 확인해 주세요."); return; }
+  hideBanner(); stopSpeaking();
+  let m; try { m = await openMic(); } catch(e) { setStatus(micErrText({ kind:"mic" })); return; }
+  const ref = P.sents.map(s => s.t).join(" ");
+  const st = { m, segs: [], partial: "", t0: 0, last: 0, heard: false, ending: false, timer: null };
+  whole = st; $("#mic").disabled = true; $("#micLabel").textContent = "준비 중…";
+  beep(m.ctx); await sleep(130);
+  if (whole !== st) return;
+  st.take = beginTake(m); st.t0 = st.last = Date.now();
+  const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(st.take.push));
+  const pa = new SpeechSDK.PronunciationAssessmentConfig(ref, SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, false);
+  try { pa.enableProsodyAssessment = true; } catch(e) {}
+  pa.applyTo(rec); st.rec = rec;
+  st.stopped = new Promise(r => { rec.sessionStopped = () => r(); rec.canceled = (s, e) => { if (e && e.reason === SpeechSDK.CancellationReason.Error) st.err = e.errorDetails; r(); }; });
+  rec.recognizing = (s, e) => { st.partial = e.result.text || ""; st.last = Date.now(); st.heard = true; wholeLive(st); };
+  rec.recognized = (s, e) => {
+    if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) {
+      try { st.segs.push(JSON.parse(e.result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult))); } catch(err) {}
+      st.partial = ""; st.last = Date.now(); st.heard = true; wholeLive(st);
+    }
+  };
+  $("#mic").disabled = false; goSignal(true, "● 읽는 중 · 다 읽으면 누르세요");
+  rec.startContinuousRecognitionAsync(() => {}, err => { st.err = String(err); wholeFinish(); });
+  st.timer = setInterval(() => {
+    const now = Date.now(), el = (now - st.t0) / 1000;
+    if (!st.ending && !st.partial) setStatus(`${fmtT(el)} 읽는 중`);
+    if (st.heard && now - st.last > 8000) wholeFinish();
+    else if (!st.heard && el > 15) wholeFinish();
+    else if (el > 600) wholeFinish();
+  }, 500);
+}
+function wholeLive(st){ const w = (st.partial || "").split(/\s+/).slice(-8).join(" "); setStatus(`${fmtT((Date.now() - st.t0) / 1000)} · ${w}`); }
+async function wholeFinish(){
+  const st = whole; if (!st || st.ending) return;
+  st.ending = true; clearInterval(st.timer); goSignal(false); $("#mic").disabled = true; $("#micLabel").textContent = "채점 정리 중…"; setStatus("마지막 부분을 정리하는 중…");
+  if (st.take) endTake(st.m);
+  if (st.stopped) await Promise.race([st.stopped, sleep(8000)]);
+  try { st.rec && st.rec.stopContinuousRecognitionAsync(() => {}, () => {}); } catch(e) {}
+  await sleep(200); try { st.rec && st.rec.close(); } catch(e) {}
+  closeMic(); whole = null; $("#mic").disabled = false;
+  if (!P) { readSetMic(); return; }
+  const a = analyzeWhole(st.segs);
+  if (!a.ok) { setStatus(st.err ? "Azure 연결 문제예요: " + st.err : "말소리가 들리지 않았어요. 다시 해 주세요."); renderRead(); return; }
+  wholeAudio = st.take ? wavUrl(st.take.chunks) : "";
+  const round = { n: P.rnd.n, mode: "whole", d: new Date().toLocaleDateString("en-CA"), cnt: P.sents.length, pron: a.sc.pron, acc: a.sc.acc, flu: a.sc.flu, pros: a.sc.pros, omit: a.omit, weak: a.weak };
+  P.lastWhole = { ...a, n: P.rnd.n, fresh: true };
+  P.rounds.push(round); P.rnd = { n: P.rnd.n + 1, res: {} }; P.cur = 0; saveP(); upsertHist();
+  setStatus(""); renderRead(); $("#focus").scrollIntoView({ behavior:"smooth", block:"start" });
+  await speak([{ lang:"ko", text: `${round.n}회차 끝. 발음 ${Math.round(round.pron)}점, 빠뜨린 단어 ${round.omit}개예요.` }]);
+  await coachRound(round);
+}
+
+/* ---------- ③ 말하기: 질문 3개에 답하기 ---------- */
+let qaOn = false, qaLoop = 0, free = null;
+function qaState(){ if (!P) return null; if (!P.qa) { P.qa = { qs: [], ans: [], fb: null, prev: null, tries: 1 }; } return P.qa; }
+async function freeTake(maxSec){
+  const cfg = baseCfg(); if (!cfg) throw { kind:"az" };
+  let m; try { m = await openMic(); } catch(e) { throw { kind:"mic" }; }
+  beep(m.ctx); await sleep(130);
+  const take = beginTake(m);
+  const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(take.push));
+  const st = { texts: [], partial: "", t0: Date.now(), last: Date.now(), heard: false, done: null };
+  const stopped = new Promise(r => { rec.sessionStopped = () => r(); rec.canceled = () => r(); });
+  rec.recognizing = (s, e) => { st.partial = e.result.text || ""; st.last = Date.now(); st.heard = true; qaLive(st); };
+  rec.recognized = (s, e) => { if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) { st.texts.push(e.result.text); st.partial = ""; st.last = Date.now(); qaLive(st); } };
+  rec.startContinuousRecognitionAsync(() => {}, () => st.done && st.done());
+  goSignal(true, "● 말하는 중 · 다 말하면 누르세요");
+  await new Promise(resolve => {
+    st.done = resolve; free = st;
+    st.timer = setInterval(() => {
+      const now = Date.now(), el = (now - st.t0) / 1000;
+      if (!st.partial) setStatus(`${fmtT(maxSec - el)} 남음`);
+      if ((st.heard && now - st.last > 5000) || (!st.heard && el > 15) || el >= maxSec) resolve();
+    }, 400);
+  });
+  clearInterval(st.timer); free = null; goSignal(false);
+  const sec = Math.round((Date.now() - st.t0) / 1000);
+  endTake(m); await Promise.race([stopped, sleep(4000)]);
+  try { rec.stopContinuousRecognitionAsync(() => {}, () => {}); } catch(e) {}
+  await sleep(150); try { rec.close(); } catch(e) {}
+  const text = st.texts.concat(st.partial ? [st.partial] : []).join(" ").trim();
+  return { text, sec, words: wordsOf(text).length, audio: wavUrl(take.chunks) };
+}
+function qaLive(st){ const el = $("#qaLive"); if (el) el.textContent = (st.texts.join(" ") + " " + st.partial).trim() || "…"; setStatus(`${fmtT((Date.now() - st.t0) / 1000)} 말하는 중`); }
+const qaAudio = {};
+function renderQA(){
+  const box = $("#qaBox"), q = P ? qaState() : null;
+  if (!P) { box.innerHTML = `<div class="note">먼저 ① 페이지에서 오늘 페이지를 준비해 주세요.</div>`; return; }
+  if (!q.qs.length) { box.innerHTML = `<div class="lbl">오늘 페이지로 질문 3개</div><div class="note">① 무슨 일이 있었는지 ② 인물이 왜 그랬을지 ③ 나라면 / 내 경험. 질문을 소리로 들려주고, 삐 소리 뒤에 영어로 답해요. 한 질문에 최대 1분, 5초 조용하면 다음 질문으로 넘어가요.</div><div class="note">버튼을 누르면 질문을 만들어요.</div>`; return; }
+  const k = q.ans.length;
+  box.innerHTML = `<div class="row between"><div class="lbl">질문 3개 · ${q.tries}번째 답하기</div>${!qaOn ? `<button class="again" id="qaNew">새 질문</button>` : ""}</div>
+    ${q.qs.map((x, i) => {
+      const a = q.ans[i], pv = q.prev && q.prev[i], fb = q.fb && q.fb.items && q.fb.items[i];
+      return `<div class="qa ${qaOn && i === k ? "cur" : ""}"><span class="qn">Q${i + 1} · ${esc(x.type || "")}</span><span class="qe">${esc(x.en)}</span><span class="sub">${esc(x.ko)}</span>
+        ${x.hint ? `<details><summary class="sub">쓸 만한 표현 보기</summary><div class="note">${esc(x.hint)}</div></details>` : ""}
+        ${qaOn && i === k ? `<div class="live" id="qaLive" style="min-height:24px"></div>` : ""}
+        ${a ? `<div class="mine">${esc(a.text || "(말소리 없음)")}</div><div class="scores"><span>${a.sec}초</span><span>${a.words}단어</span>${pv ? `<span>지난번 ${pv.words}단어 → 이번 ${a.words}단어</span>` : ""}${qaAudio[i] ? `<button class="again" data-play="${esc(qaAudio[i])}">▶ 내 답</button>` : ""}</div>` : ""}
+        ${fb && fb.natural ? `<div class="sent">${markup(fb.natural)}</div><div class="row"><button class="again" data-say="${esc(plain(fb.natural))}">▶ 자연스러운 답 듣기</button></div>` : ""}
+      </div>`; }).join("")}
+    ${q.fb ? `<div class="fb">${q.fb.say ? `<div>${esc(q.fb.say)}</div>` : ""}
+      ${(q.fb.expressions || []).map((x, i) => `<div class="expr"><span class="tag">R</span><div class="body"><span class="en">${esc(x.en)}</span><span class="sub">${esc(x.ko)} · ${esc(x.why)}</span></div><button class="again" data-saveqa="${i}">저장</button></div>`).join("")}
+      <div class="note">자연스러운 답을 소리 내 2~3번 읽고, 같은 질문에 한 번 더 답해 보세요. 두 번째가 진짜 연습이에요.</div></div>` : ""}`;
+  const nb = $("#qaNew"); if (nb) nb.onclick = async () => { if (qaOn) return; q.qs = []; q.ans = []; q.fb = null; q.prev = null; q.tries = 1; saveP(); renderQA(); qaSetMic(); };
+  box.querySelectorAll("[data-saveqa]").forEach(b => b.onclick = () => { const x = q.fb.expressions[+b.dataset.saveqa]; addExpr({ tag:"R", en: x.en, ko: x.ko, ctx: x.ctx || "", src: P.label + " 질문 답하기" }); b.textContent = "저장됨"; b.disabled = true; });
+}
+function qaSetMic(){
+  if (O.tab !== "retell" || O.smode !== "q") return;
+  const q = P ? qaState() : null, m = $("#mic");
+  if (free) return;
+  m.classList.toggle("on", qaOn); m.disabled = false;
+  $("#micLabel").textContent = qaOn ? "멈추기" : !P ? "페이지를 먼저 준비하세요" : !q.qs.length ? "질문 만들고 시작" : q.ans.length >= 3 ? "같은 질문에 다시 답하기" : q.ans.length ? `이어서 답하기 (Q${q.ans.length + 1})` : "질문 듣고 답하기 시작";
+}
+async function makeQuestions(){
+  const q = qaState();
+  const ctx = store.get("rd_ctx", []).filter(x => x.id !== P.id).slice(0, 3).reverse().map(x => x.text).join(" ").slice(-2500);
+  const stop = progressBanner("질문 만드는 중…");
+  try {
+    const r = await gemini(`너는 영어 회화 코치야. 태원(한국인, 아직 머릿속으로 번역하며 버벅이는 단계)이 영어 소설을 한 페이지 낭독한 뒤, 책을 덮고 질문에 영어로 답할 거야.
+${ctx ? "앞 페이지들(참고만): " + ctx + "\n" : ""}오늘 페이지: ${P.sents.map(s => s.t).join(" ")}
+
+질문 3개를 이 순서로, 쉬운 영어 8~14단어, 질문 하나에 한 가지만 묻기:
+1) type "내용": 오늘 페이지에서 무슨 일이 있었는지
+2) type "인물": 인물의 감정이나 행동 이유 추측 (Why do you think ...?)
+3) type "내 생각": 태원의 의견이나 경험과 연결 (What would you do ...? / Have you ever ...?)
+ko: 한국어 뜻. hint: 답할 때 쓸 수 있는 쉬운 영어 표현 2~3개를 " / "로.
+JSON 한 개만: {"qs":[{"type":"","en":"","ko":"","hint":""}]}`, [], 0.7);
+    q.qs = (r.qs || []).slice(0, 3).map(x => ({ type: String(x.type || ""), en: String(x.en || ""), ko: String(x.ko || ""), hint: String(x.hint || "") })).filter(x => x.en);
+    q.ans = []; q.fb = null; q.prev = null; q.tries = 1; saveP(); stop(); hideBanner();
+    return q.qs.length > 0;
+  } catch(e) { stop(); showBanner(esc(aiErrText(e)), "bad"); return false; }
+}
+async function qaRun(){
+  if (!P) { setTab("page"); setStatus("먼저 오늘 페이지를 준비해 주세요."); return; }
+  if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("설정에서 Azure 키를 먼저 저장해 주세요."); return; }
+  const q = qaState();
+  const my = ++qaLoop; qaOn = true; qaSetMic();
+  const alive = () => qaOn && my === qaLoop;
+  if (!q.qs.length) { $("#micLabel").textContent = "질문 만드는 중…"; if (!(await makeQuestions())) { qaStop(""); return; } if (!alive()) return; }
+  if (q.ans.length >= 3) { q.prev = q.ans; q.ans = []; q.tries++; for (const k in qaAudio) delete qaAudio[k]; saveP(); }
+  renderQA();
+  try { await openMic(); } catch(e) { qaStop(micErrText({ kind:"mic" })); return; }
+  while (alive() && q.ans.length < 3) {
+    const i = q.ans.length; renderQA(); qaSetMic();
+    $(".qa.cur") && $(".qa.cur").scrollIntoView({ behavior:"smooth", block:"center" });
+    setStatus(`Q${i + 1} 질문을 들려줄게요`);
+    await speak([{ lang:"en", text: q.qs[i].en }]); if (!alive()) return;
+    let a;
+    try { a = await freeTake(60); } catch(e) { qaStop(micErrText(e)); return; }
+    if (!alive()) return;
+    q.ans.push({ text: a.text, sec: a.sec, words: a.words }); qaAudio[i] = a.audio; saveP();
+  }
+  qaStop(""); setStatus("");
+  renderQA(); await qaFeedback();
+}
+function qaStop(msg){ qaOn = false; qaLoop++; if (free && free.done) free.done(); stopSpeaking(); closeMic(); goSignal(false); renderQA(); qaSetMic(); if (msg != null) setStatus(msg); }
+async function qaFeedback(){
+  const q = qaState(); if (!store.get("gm_key", "") || !q.ans.some(a => a.text)) { qaSetMic(); return; }
+  const stop = progressBanner("답을 다듬는 중…");
+  try {
+    const r = await gemini(`너는 한국인 학습자(태원)의 영어 말하기 코치야. 태원은 아직 머릿속으로 번역하며 버벅이는 단계라, 바로 따라 말할 수 있는 쉬운 수준으로 도와줘.
+태원이 영어 소설 한 페이지를 읽고 책을 덮은 뒤 질문에 영어로 답했어(Azure 받아쓰기라 오타가 있을 수 있어).
+오늘 페이지: ${P.sents.map(s => s.t).join(" ")}
+${q.qs.map((x, i) => `Q${i + 1}: ${x.en}\n태원: ${(q.ans[i] && q.ans[i].text) || "(답 없음)"}`).join("\n")}
+${q.prev ? "지난번 답: " + q.prev.map((a, i) => `Q${i + 1}: ${a.text || "(없음)"}`).join(" / ") : ""}
+
+- items: 질문마다 natural 1개. 태원이 말한 내용과 생각을 살려 자연스럽게 고친 2~3문장, 태원 수준보다 살짝 위, 쉬운 단어. 답이 없으면 쉬운 모범답. 강세 내용어는 대문자, 연음 경계는 ‿.
+- expressions: 태원이 막혔거나 어색했던 곳에 바로 쓸 표현 3개. en(짧은 구), ko, why(한국어 한 문장), ctx(그 표현이 들어간 natural 문장).
+- say: 한국어 2문장 이내, "태원님~"으로 시작. ${q.prev ? "지난번보다 나아진 점 1개 + " : "칭찬 1개 + "}다음에 할 것 1개.
+JSON 한 개만: {"items":[{"natural":""}],"expressions":[{"en":"","ko":"","why":"","ctx":""}],"say":""}`, [], 0.6);
+    q.fb = { items: (r.items || []).slice(0, 3), expressions: (r.expressions || []).slice(0, 3), say: r.say || "" };
+    saveP(); stop(); hideBanner(); renderQA(); qaSetMic();
+    if (q.fb.say) await speak([{ lang:"ko", text: q.fb.say }]);
+  } catch(e) { stop(); showBanner(esc(aiErrText(e)), "bad"); qaSetMic(); }
+}
+
+/* ---------- ③ 말하기: 다시 말하기 3번 (4/3/2) ---------- */
+const RET_LENS = { short:[45, 30, 20], normal:[60, 45, 30] };
 let ret = null;
 const fmtT = s => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, Math.ceil(s)) % 60).padStart(2, "0")}`;
 function retSetMic(){
-  if (O.tab !== "retell") return;
+  if (O.tab !== "retell" || O.smode === "q") return;
   const m = $("#mic"); m.classList.toggle("on", !!ret); m.disabled = !!(ret && ret.ending);
   const k = P ? (P.ret.res || []).length : 0, lens = RET_LENS[O.retLen];
   $("#micLabel").textContent = ret ? (ret.ending ? "정리 중…" : "끝내기") : !P ? "페이지를 먼저 준비하세요" : k >= 3 ? "처음부터 다시 3번" : `${k + 1}번째 말하기 시작 · ${fmtT(lens[k])}`;
 }
 function renderRetell(){
+  if (!O.smode) O.smode = "q";
+  $$("[data-smode]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.smode === O.smode)); b.onclick = () => { if (qaOn || ret) return; O.smode = b.dataset.smode; saveO(); renderRetell(); }; });
+  $("#modeQ").hidden = O.smode !== "q"; $("#modeRe").hidden = O.smode === "q";
+  if (O.smode === "q") { renderQA(); qaSetMic(); return; }
   $$("[data-len]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.len === O.retLen)); b.onclick = () => { if (ret) return; O.retLen = b.dataset.len; saveO(); renderRetell(); }; });
   const k = P ? (P.ret.res || []).length : 0;
   $$("#retSteps span").forEach((s, i) => s.className = i < k ? "done" : i === k ? "now" : "");
@@ -1038,8 +1358,16 @@ $("#exCsv").onclick = async () => {
 
 /* ---------- 마이크 버튼 ---------- */
 $("#mic").onclick = async () => {
-  if (O.tab === "read") { if (readOn) readStop("멈췄어요. 버튼을 누르면 이어서 해요."); else readRun(); return; }
-  if (O.tab === "retell") { if (ret) retFinish(); else retStart(); }
+  if (O.tab === "read") {
+    if (whole) { wholeFinish(); return; }
+    if (readOn) { readStop("멈췄어요. 버튼을 누르면 이어서 해요."); return; }
+    if (roundMode() === "whole") wholeStart(); else readRun();
+    return;
+  }
+  if (O.tab === "retell") {
+    if (O.smode === "q") { if (free) { free.done(); return; } if (qaOn) { qaStop("멈췄어요. 버튼을 누르면 이어서 해요."); return; } qaRun(); return; }
+    if (ret) retFinish(); else retStart();
+  }
 };
 
 loadSettings(); renderMeter(); setTab(O.tab);
