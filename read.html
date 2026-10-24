@@ -133,14 +133,18 @@ table.t th{color:var(--ink3);font-weight:600;font-size:11.5px}
 .mine{font-size:14px;color:var(--ink2);border-left:3px solid var(--line);padding-left:9px}
 details summary{cursor:pointer}
 [hidden]{display:none!important}
+.appnav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.appnav a{display:block;text-align:center;padding:8px 4px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--ink2);text-decoration:none}
+.appnav a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <div class="brand">원서 낭독<small>듣고 · 따라 읽고 · 책 덮고 말하기</small></div>
-    <div class="toplinks"><a class="linkbtn" href="./voice.html">보이스 스파링</a><button class="linkbtn" id="toggleSettings">설정</button></div>
+    <div class="toplinks"><button class="linkbtn" id="toggleSettings">설정</button></div>
   </header>
+  <nav class="appnav" aria-label="메뉴"><a href="./">발음 채점</a><a href="./voice.html">보이스 스파링</a><a href="./read.html" aria-current="page">원서 낭독</a></nav>
   <div class="meter" id="meter"></div>
   <div class="banner warn" id="banner" hidden></div>
 

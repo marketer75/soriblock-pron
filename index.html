@@ -74,14 +74,18 @@ ul.tips b{color:var(--accent)}
 .chip{font-family:var(--mono);font-size:13px;padding:3px 9px;border-radius:999px;background:var(--bad-soft);color:var(--bad)}
 .note{font-size:12.5px;color:var(--ink3)}
 [hidden]{display:none!important}
+.appnav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.appnav a{display:block;text-align:center;padding:8px 4px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--ink2);text-decoration:none}
+.appnav a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <div class="brand">소리블록 발음 채점<small>Azure 발음 평가 · 음소 단위</small></div>
-    <span style="display:flex;gap:12px"><a class="linkbtn" href="./voice.html" style="text-decoration:none">보이스 스파링</a><button class="linkbtn" id="toggleSettings">설정</button></span>
+    <button class="linkbtn" id="toggleSettings">설정</button>
   </header>
+  <nav class="appnav" aria-label="메뉴"><a href="./" aria-current="page">발음 채점</a><a href="./voice.html">보이스 스파링</a><a href="./read.html">원서 낭독</a></nav>
 
   <section class="card" id="settings" hidden>
     <div class="lbl">AZURE 음성 키 (이 폰에만 저장돼요)</div>
