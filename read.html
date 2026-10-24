@@ -176,7 +176,7 @@ details summary{cursor:pointer}
         <button class="btn ghost" id="pgPasteBtn">✎ 텍스트 붙여넣기</button>
       </div>
       <input id="pgPhoto" type="file" accept="image/*" multiple hidden>
-      <textarea id="pgText" rows="7" placeholder="낭독할 부분을 붙여 넣으세요" hidden></textarea>
+      <textarea id="pgText" rows="7" placeholder="낭독할 부분을 붙여 넣으세요. 갤러리에서 페이지 사진을 열고 '텍스트 추출'(T 버튼)로 복사하면 가장 빨라요." hidden></textarea>
       <button class="btn" id="pgPasteGo" hidden>이 텍스트로 시작</button>
       <div class="note">하루 1페이지(대화나 해나 독백 위주)를 권해요. 사진은 두 장까지 한 번에 올릴 수 있어요. 사진·텍스트는 문장 정리를 위해 Gemini로만 보내고, 정리된 본문은 이 폰 브라우저에만 남아요. 앱 코드나 GitHub에는 올라가지 않아요.</div>
     </div>
@@ -355,20 +355,24 @@ function thinkCfg(model){
   if (/gemini-[3-9]/.test(model)) return { thinkingLevel: "low" };
   return null;
 }
-async function gemini(prompt, images = [], temp = 0.7){
+async function gemini(prompt, images = [], temp = 0.7, opt = {}){
   const key = store.get("gm_key", "");
   if (!key) throw { kind:"nokey" };
   await ensureModels(key);
   const tried = {}; aiNote = "";
   const parts = images.map(b64 => ({ inline_data: { mime_type:"image/jpeg", data: b64 } })).concat([{ text: prompt }]);
+  const deadline = Date.now() + (opt.total || 180000);
   for (let attempt = 0; attempt < 8; attempt++) {
-    const list = usable();
+    if (Date.now() > deadline) throw { kind:"slow" };
+    let list = usable();
     if (!list.length) throw { kind:"allday" };
-    const model = list.find(m => (tried[m] || 0) < 2);
+    if (opt.lite) list = list.filter(m => /lite/i.test(m)).concat(list.filter(m => !/lite/i.test(m)));   // 글자 옮기기는 가벼운 모델이 더 빠름
+    const model = list.find(m => (tried[m] || 0) < (opt.lite ? 1 : 2)) || list.find(m => (tried[m] || 0) < 2);
     if (!model) throw { kind:"busy" };
+    aiNote = attempt ? `${attempt + 1}번째 시도${aiNote ? " · " + aiNote : ""}` : aiNote;
     let r; aiModel = model.replace("models/", "");
     const gc = { responseMimeType:"application/json", temperature: temp }, tc = thinkCfg(model); if (tc) gc.thinkingConfig = tc;
-    const ac = new AbortController(), to = setTimeout(() => ac.abort(), images.length ? 90000 : 60000);
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), Math.max(5000, Math.min(opt.each || (images.length ? 90000 : 60000), deadline - Date.now())));
     try {
       r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent`, {
         method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key": key }, signal: ac.signal,
@@ -402,6 +406,7 @@ function aiErrText(e){
   if (e.kind === "key") { $("#settings").hidden = false; return "Gemini 키가 맞는지 설정에서 확인해 주세요."; }
   if (e.kind === "allday") return `오늘 Gemini 무료 한도를 다 썼어요. ${resetTimeLocal()}에 초기화돼요. (낭독 채점은 Azure라 계속 돼요)`;
   if (e.kind === "busy") return "Gemini가 붐벼요. 10~20초 뒤 다시 해 주세요.";
+  if (e.kind === "slow") return "Gemini가 지금 너무 느려요. 갤러리에서 사진을 열고 '텍스트 추출'(T 버튼)로 글자를 복사한 뒤 '텍스트 붙여넣기'로 넣으면 바로 시작할 수 있어요.";
   return e.msg || "문제가 생겼어요. 다시 해 주세요.";
 }
 
@@ -625,7 +630,7 @@ async function toJpeg(file){
   try {
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-    const max = 1600, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+    const max = 1280, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
     const cv = document.createElement("canvas"); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
     cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
     return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
@@ -642,23 +647,17 @@ async function prepPage(images, text){
   const label = $("#pgLabel").value.trim() || new Date().toLocaleDateString("ko-KR");
   const busyBtns = [$("#pgPasteGo"), $("#pgPasteBtn")]; busyBtns.forEach(b => b.disabled = true);
   setStatus("");
-  const stop = progressBanner(images.length ? "페이지 글자를 읽는 중… (보통 20~40초)" : "문장으로 나누는 중…");
+  const stop = progressBanner(images.length ? "페이지 글자를 읽는 중… (보통 10~30초, 2분 넘으면 멈춰요)" : "문장으로 나누는 중…");
   try {
     const r = await gemini(`${images.length ? "사진 속 영어 소설 페이지(여러 장이면 순서대로)의 본문을 정확히 옮겨 적어." : "아래 영어 소설 텍스트를 문장으로 나눠."}
 - 본문만. 쪽번호·머리글·장 제목 장식은 빼. 줄 끝 하이픈으로 끊긴 단어는 붙여.
 - 원문 단어를 바꾸거나 고치지 마. 따옴표 안 대화도 그대로.
 - 한 문장씩 나눠. 25단어가 넘는 문장은 쉼표 같은 자연스러운 쉼에서 둘로 나눠.
-JSON 한 개만: {"s":["문장1","문장2"]}${text ? "\n\n텍스트:\n" + text : ""}`, images, 0.1);
+JSON 한 개만: {"s":["문장1","문장2"]}${text ? "\n\n텍스트:\n" + text : ""}`, images, 0.1, { lite: true, each: 40000, total: 120000 });
     const sents = (r.s || r.sents || []).map(x => String(typeof x === "string" ? x : (x && x.t) || "").trim())
       .filter(t => wordsOf(t).length).map(t => ({ t, a: t, ko: "" }));
     if (!sents.length) throw { kind:"other", msg:"글자를 찾지 못했어요. 페이지가 화면에 꽉 차게, 밝은 곳에서 다시 찍어 주세요." };
-    if (P && P.rounds.length) upsertHist();
-    if (P && P.sents) { const cx = store.get("rd_ctx", []).filter(x => x.id !== P.id); cx.unshift({ id: P.id, label: P.label, text: P.sents.map(x => x.t).join(" ") }); store.set("rd_ctx", cx.slice(0, 4)); }
-    P = { id: Date.now().toString(36), label, date: new Date().toLocaleDateString("en-CA"), sents, rules: {}, cur: 0, rnd: { n: 1, res: {} }, rounds: [], ret: { res: [], fb: null }, annot: "pending" };
-    saveP(); upsertHist(); stop(); hideBanner();
-    $("#pgText").value = ""; $("#pgText").hidden = true; $("#pgPasteGo").hidden = true; $("#pgLabel").value = "";
-    renderPage(); setStatus(`${sents.length}문장으로 정리했어요. 바로 낭독을 시작해도 돼요.`);
-    annotate();
+    stop(); startPage(sents.map(x => x.t), label);
   } catch(e) {
     stop(); showBanner(esc(aiErrText(e)), "bad");
   } finally { busyBtns.forEach(b => b.disabled = false); }
@@ -699,7 +698,42 @@ $("#pgPhoto").onchange = async e => {
   catch(err) { showBanner("사진을 읽지 못했어요. 다른 사진으로 해 주세요.", "bad"); }
 };
 $("#pgPasteBtn").onclick = () => { const h = !$("#pgText").hidden; $("#pgText").hidden = h; $("#pgPasteGo").hidden = h; if (!h) $("#pgText").focus(); };
-$("#pgPasteGo").onclick = () => { const t = $("#pgText").value.trim(); if (!t) { setStatus("텍스트를 붙여 넣어 주세요."); return; } prepPage([], t.slice(0, 6000)); };
+function splitLocal(text){
+  // 쪽번호·책 제목 머리글 줄(대문자뿐인 짧은 줄)은 빼기
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.replace(/^\s*\d+\s+|\s+\d+\s*$/g, "").trim())
+    .filter(l => l && !/^\d+$/.test(l) && !(l.length < 50 && /[A-Z]/.test(l) && l === l.toUpperCase() && !/[.!?"”]$/.test(l)));
+  const t = lines.join("\n").replace(/-\n(?=[a-z])/g, "").replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim();
+  const ABBR = /\b(Mr|Mrs|Ms|Dr|St|Jr|Sr|vs|etc|Mt)\.$/;
+  const out = []; let cur = "";
+  const parts = t.match(/[^.!?…]+(?:[.!?…]+["”’')\]]*|$)\s*/g) || [t];
+  parts.forEach(pt => { cur += pt; if (!ABBR.test(cur.trim())) { out.push(cur.trim()); cur = ""; } });
+  if (cur.trim()) out.push(cur.trim());
+  // 25단어 넘는 문장은 쉼표에서 나눔
+  const fin = [];
+  out.forEach(x => {
+    const w = x.split(" ");
+    if (w.length <= 25) { fin.push(x); return; }
+    let buf = [];
+    w.forEach((tok, i) => { buf.push(tok); if (buf.length >= 10 && /[,;:—–]$/.test(tok) && w.length - i > 6) { fin.push(buf.join(" ")); buf = []; } });
+    if (buf.length) fin.push(buf.join(" "));
+  });
+  return fin.filter(x => wordsOf(x).length);
+}
+function startPage(sents, label){
+  if (P && P.rounds.length) upsertHist();
+  if (P && P.sents) { const cx = store.get("rd_ctx", []).filter(x => x.id !== P.id); cx.unshift({ id: P.id, label: P.label, text: P.sents.map(x => x.t).join(" ") }); store.set("rd_ctx", cx.slice(0, 4)); }
+  P = { id: Date.now().toString(36), label, date: new Date().toLocaleDateString("en-CA"), sents: sents.map(t => ({ t, a: t, ko: "" })), rules: {}, cur: 0, rnd: { n: 1, res: {} }, rounds: [], ret: { res: [], fb: null }, annot: "pending" };
+  saveP(); upsertHist(); hideBanner();
+  $("#pgText").value = ""; $("#pgText").hidden = true; $("#pgPasteGo").hidden = true; $("#pgLabel").value = "";
+  renderPage(); setStatus(`${sents.length}문장으로 정리했어요. 바로 낭독을 시작해도 돼요.`);
+  if (store.get("gm_key", "")) annotate();
+}
+$("#pgPasteGo").onclick = () => {
+  const t = $("#pgText").value.trim(); if (!t) { setStatus("텍스트를 붙여 넣어 주세요."); return; }
+  const sents = splitLocal(t.slice(0, 8000));
+  if (!sents.length) { setStatus("영어 문장을 찾지 못했어요."); return; }
+  startPage(sents, $("#pgLabel").value.trim() || new Date().toLocaleDateString("ko-KR"));
+};
 function renderPage(){
   const now = $("#pgNow");
   if (!P) { now.hidden = true; }
