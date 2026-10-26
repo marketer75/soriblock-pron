@@ -475,6 +475,66 @@ function scoreAudio(chunks, refText){
     }, () => { clearTimeout(t); try { rec.close(); } catch(e) {} resolve(null); });
   });
 }
+// 대화·AI 드릴용: 생각하느라 멈춰도 끊지 않고 계속 듣기 (버튼을 누르거나 7초 조용하면 끝)
+let longCur = null;
+async function listenLong(maxSec = 90){
+  const cfg = baseCfg(); if (!cfg) throw { kind:"az" };
+  let c; try { c = await startCapture(); } catch(e) { throw { kind:"mic", msg: String(e) }; }
+  const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(c.push));
+  const st = { texts: [], partial: "", t0: Date.now(), last: Date.now(), heard: false, err: null };
+  const stopped = new Promise(r => { rec.sessionStopped = () => r(); rec.canceled = (s, e) => { if (e && e.reason === SpeechSDK.CancellationReason.Error) st.err = e.errorDetails; r(); }; });
+  const live = () => { const t = (st.texts.join(" ") + " " + st.partial).trim(); setStatus(t ? "듣는 중: " + t : "말씀하세요. 생각하느라 멈춰도 괜찮아요."); };
+  rec.recognizing = (s, e) => { st.partial = e.result.text || ""; st.last = Date.now(); st.heard = true; live(); };
+  rec.recognized = (s, e) => { if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) { st.texts.push(e.result.text); st.partial = ""; st.last = Date.now(); st.heard = true; live(); } };
+  live();
+  let cancelled = false;
+  await new Promise(resolve => {
+    longCur = { finish: () => resolve(), cancel: () => { cancelled = true; resolve(); } };
+    rec.startContinuousRecognitionAsync(() => {}, err => { st.err = String(err); resolve(); });
+    st.timer = setInterval(() => {
+      const now = Date.now(), el = (now - st.t0) / 1000;
+      if ((st.heard && now - st.last > 7000) || (!st.heard && el > 12) || el > maxSec || st.err) resolve();
+    }, 300);
+  });
+  clearInterval(st.timer); longCur = null;
+  setMic("wait"); setStatus("마무리하는 중…");
+  stopCapture(c);   // 마이크를 먼저 끄고(스트림 닫힘 → 인식기가 마지막 구간을 마무리)
+  await Promise.race([stopped, sleep(4000)]);
+  try { rec.stopContinuousRecognitionAsync(() => {}, () => {}); } catch(e) {}
+  await sleep(150); try { rec.close(); } catch(e) {}
+  if (cancelled) throw { kind:"cancel" };
+  const text = st.texts.concat(st.partial ? [st.partial] : []).join(" ").trim();
+  if (!text) { if (st.err) throw { kind:"azerr", msg: st.err }; throw { kind:"nomatch", why: st.heard ? "notrec" : "silence" }; }
+  return { text, chunks: c.chunks, json: null };
+}
+// 긴 답 전체를 채점: 쉬는 곳에서 나뉜 구간들을 합쳐 한 결과로
+function scoreAudioLong(chunks, refText){
+  return new Promise(resolve => {
+    const cfg = baseCfg(); if (!cfg || !chunks.length) return resolve(null);
+    const push = SpeechSDK.AudioInputStream.createPushStream(SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1));
+    chunks.forEach(ch => push.write(ch.buffer.slice(0))); push.write(new Int16Array(16000).buffer); push.close();
+    const rec = new SpeechSDK.SpeechRecognizer(cfg, SpeechSDK.AudioConfig.fromStreamInput(push));
+    const pa = new SpeechSDK.PronunciationAssessmentConfig(refText, SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark, SpeechSDK.PronunciationAssessmentGranularity.Phoneme, false);
+    pa.phonemeAlphabet = "IPA"; pa.nbestPhonemeCount = 3; try { pa.enableProsodyAssessment = true; } catch(e) {}
+    pa.applyTo(rec);
+    const segs = []; let done = false;
+    const finish = () => {
+      if (done) return; done = true; clearTimeout(t);
+      try { rec.stopContinuousRecognitionAsync(() => {}, () => {}); } catch(e) {} setTimeout(() => { try { rec.close(); } catch(e) {} }, 100);
+      const words = [], w = { acc: 0, flu: 0, pros: 0, pron: 0 }, n = { acc: 0, flu: 0, pros: 0, pron: 0 };
+      segs.forEach(j => { const nb = j.NBest && j.NBest[0]; if (!nb) return; const a = nb.PronunciationAssessment || {}, d = Math.max(1, (nb.Words || []).length);
+        [["acc","AccuracyScore"],["flu","FluencyScore"],["pros","ProsodyScore"],["pron","PronScore"]].forEach(([k, f]) => { if (a[f] != null) { w[k] += a[f] * d; n[k] += d; } });
+        (nb.Words || []).forEach(x => words.push(x)); });
+      if (!words.length) return resolve(null);
+      const avg = k => n[k] ? w[k] / n[k] : null;
+      resolve({ NBest: [{ PronunciationAssessment: { PronScore: avg("pron") ?? avg("acc"), AccuracyScore: avg("acc"), FluencyScore: avg("flu"), ProsodyScore: avg("pros") }, Words: words }] });
+    };
+    const t = setTimeout(finish, 30000);
+    rec.recognized = (s, e) => { if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) { try { segs.push(JSON.parse(e.result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult))); } catch(err) {} } };
+    rec.sessionStopped = finish; rec.canceled = finish;
+    rec.startContinuousRecognitionAsync(() => {}, finish);
+  });
+}
 function pronSummary(json){
   const nb = json && json.NBest && json.NBest[0]; if (!nb) return { text:"(발음 데이터 없음)", scores:null };
   const pa = nb.PronunciationAssessment || {};
@@ -497,7 +557,7 @@ function pronSummary(json){
 const log = $("#log");
 function addMsg(role, html){ const d = document.createElement("div"); d.className = "msg " + role; d.innerHTML = html; log.append(d); d.scrollIntoView({ block:"end", behavior:"smooth" }); return d; }
 function setStatus(t){ $("#status").textContent = t; }
-function setMic(state){ const m = $("#mic"); m.classList.toggle("on", state === "rec"); $("#micLabel").textContent = { idle:"누르고 영어로 말하기", rec:"듣는 중… (말이 끝나면 자동 채점)", start:"시작", wait:"잠깐만요…" }[state]; m.disabled = state === "wait"; }
+function setMic(state){ const m = $("#mic"); m.classList.toggle("on", state === "rec"); $("#micLabel").textContent = { idle:"누르고 영어로 말하기", rec:"● 다 말하면 누르세요", start:"시작", wait:"잠깐만요…" }[state]; m.disabled = state === "wait"; }
 function markup(s){ return esc(s).replace(/‿/g,'<span class="l">‿</span>').replace(/\b([A-Z][A-Z']{1,})\b/g, m => `<span class="s">${m}</span>`); }
 function plain(s){ return String(s||"").replace(/‿/g," ").replace(/\b([A-Z][A-Z']+)\b/g, m => m[0] + m.slice(1).toLowerCase()); }
 const VL = { pass:["v-pass","통과"], close:["v-close","거의 맞았어요"], retry:["v-retry","다시 해 봐요"] };
@@ -774,6 +834,7 @@ $("#mic").onclick = async () => {
     if (!store.get("az_key", "")) { $("#settings").hidden = false; setStatus("설정에서 Azure 키를 먼저 저장해 주세요."); return; }
     hideBanner(); bankRun(); return;
   }
+  if (longCur) { longCur.finish(); return; }
   if (recognizer || cap) { cancelListen(); setMic("idle"); setStatus(""); return; }
   if (busy) return;
   busy = true; hideBanner(); stopSpeaking();
@@ -783,9 +844,9 @@ $("#mic").onclick = async () => {
       started = true;
       await (S.mode === "drill" ? drillStart() : chatStart());
     } else {
-      setMic("rec"); setStatus("말씀하세요.");
-      const heard = await listen();
-      setStatus("발음 채점 중…"); heard.json = await scoreAudio(heard.chunks, heard.text).catch(() => null);
+      setMic("rec");
+      const heard = await listenLong();
+      setStatus("발음 채점 중…"); heard.json = await scoreAudioLong(heard.chunks, heard.text).catch(() => null);
       await (S.mode === "drill" ? drillAnswer(heard) : chatAnswer(heard));
     }
   } catch(e) {
@@ -806,8 +867,8 @@ $("#mic").onclick = async () => {
 
 /* ---------- 선택 변경 ---------- */
 const INTRO_BANK = `<span><b>복습 시작</b>을 누르면 버튼 없이 계속 이어져요: 한국어 문제 듣기 → 바로 영어로 말하기 → 즉시 채점 → 틀리면 정답 따라 말하기 → 다음 문제.</span><span class="sub">모르면 "skip"이라고 말하세요. 10초 동안 조용하면 자동으로 멈춰요.</span>`;
-const INTRO_AI = `<span>아래 <b>시작</b> 버튼을 누르면 AI가 새 문제를 만들어 소리로 읽어 드려요. 듣고 나서 마이크 버튼을 누르고 영어로 말하면 돼요.</span><span class="sub">말이 끝나고 1초쯤 조용하면 자동으로 채점돼요.</span>`;
-function restart(){ if (bankOn) bankStop(); bankItem = null; bankRecent = []; if (S.mode === "bank") { renderBankInfo(); bankSetMic(); setStatus(""); } started = false; item = null; turns = []; if (S.mode !== "bank") { setMic("start"); setStatus("설정이 바뀌었어요. 시작을 누르면 새로 시작해요."); } }
+const INTRO_AI = `<span>아래 <b>시작</b> 버튼을 누르면 AI가 새 문제를 만들어 소리로 읽어 드려요. 듣고 나서 마이크 버튼을 누르고 영어로 말하면 돼요.</span><span class="sub">생각하느라 멈춰도 계속 들어요. 다 말하면 버튼을 한 번 더 누르세요. (7초 동안 조용하면 자동으로 끝나요)</span>`;
+function restart(){ if (longCur) longCur.cancel(); if (bankOn) bankStop(); bankItem = null; bankRecent = []; if (S.mode === "bank") { renderBankInfo(); bankSetMic(); setStatus(""); } started = false; item = null; turns = []; if (S.mode !== "bank") { setMic("start"); setStatus("설정이 바뀌었어요. 시작을 누르면 새로 시작해요."); } }
 $("#stage").onchange = e => { S.stage = +e.target.value; S.part = partsOf(S.stage)[0][1]; renderParts(); saveS(); restart(); };
 $("#partSel").onchange = e => { S.part = +e.target.value; renderParts(); saveS(); restart(); };
 document.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { S.scope = b.dataset.scope; renderParts(); saveS(); restart(); });
